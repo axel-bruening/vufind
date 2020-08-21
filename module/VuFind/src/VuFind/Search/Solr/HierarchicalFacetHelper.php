@@ -2,7 +2,7 @@
 /**
  * Facet Helper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) The National Library of Finland 2014.
  *
@@ -17,40 +17,71 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Solr;
 
 use VuFind\I18n\TranslatableString;
+use VuFind\I18n\Translator\TranslatorAwareInterface;
+use VuFind\I18n\Translator\TranslatorAwareTrait;
+use VuFind\Search\UrlQueryHelper;
 
 /**
  * Functions for manipulating facets
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class HierarchicalFacetHelper
+class HierarchicalFacetHelper implements TranslatorAwareInterface
 {
+    use TranslatorAwareTrait;
+
     /**
      * Helper method for building hierarchical facets:
      * Sort a facet list according to the given sort order
      *
-     * @param array $facetList Facet list returned from Solr
-     * @param bool  $topLevel  Whether to sort only top level
+     * @param array          $facetList Facet list returned from Solr
+     * @param boolean|string $order     Sort order:
+     * - true|top  sort top level alphabetically and the rest by count
+     * - false|all sort all levels alphabetically
+     * - count     sort all levels by count
      *
      * @return void
      */
-    public function sortFacetList(&$facetList, $topLevel)
+    public function sortFacetList(&$facetList, $order = null)
     {
+        // We need a boolean flag indicating whether or not to sort only the top
+        // level of the hierarchy. If we received a string configuration option,
+        // we should set the flag accordingly (boolean values of $order are
+        // supported for backward compatibility).
+        $topLevel = $order ?? 'count';
+        if (is_string($topLevel)) {
+            switch (strtolower(trim($topLevel))) {
+            case 'top':
+                $topLevel = true;
+                break;
+            case 'all':
+                $topLevel = false;
+                break;
+            case '':
+            case 'count':
+                // At present, we assume the incoming list is already sorted by
+                // count, so no further action is needed. If in future we need
+                // to support re-sorting an arbitrary list, rather than simply
+                // operating on raw Solr values, we may need to implement logic.
+                return;
+            }
+        }
+
         // Parse level from each facet value so that the sort function
         // can run faster
         foreach ($facetList as &$facetItem) {
@@ -85,6 +116,7 @@ class HierarchicalFacetHelper
      * @param string    $facet     Facet name
      * @param array     $facetList Facet list
      * @param UrlHelper $urlHelper Query URL helper for building facet URLs
+     * @param bool      $escape    Whether to escape URLs
      *
      * @return array Facet hierarchy
      *
@@ -92,15 +124,14 @@ class HierarchicalFacetHelper
      * converting-a-flat-array-with-parent-ids-to-a-nested-tree/
      * Based on this example
      */
-    public function buildFacetArray($facet, $facetList, $urlHelper = false)
-    {
-        // getParamArray() is expensive, so call it just once and pass it on
-        $paramArray = $urlHelper !== false ? $urlHelper->getParamArray() : null;
+    public function buildFacetArray($facet, $facetList, $urlHelper = false,
+        $escape = true
+    ) {
         // Create a keyed (for conversion to hierarchical) array of facet data
         $keyedList = [];
         foreach ($facetList as $item) {
             $keyedList[$item['value']] = $this->createFacetItem(
-                $facet, $item, $urlHelper, $paramArray
+                $facet, $item, $urlHelper, $escape
             );
         }
 
@@ -148,15 +179,18 @@ class HierarchicalFacetHelper
     /**
      * Format a facet display text for displaying
      *
-     * @param string $displayText Display text
-     * @param bool   $allLevels   Whether to display all levels or only
-     * the current one
-     * @param string $separator   Separator string displayed between levels
+     * @param string       $displayText Display text
+     * @param bool         $allLevels   Whether to display all levels or only the
+     * current one
+     * @param string       $separator   Separator string displayed between levels
+     * @param string|false $domain      Translation domain for default translations
+     * of a multilevel string or false to omit translation
      *
      * @return TranslatableString Formatted text
      */
     public function formatDisplayText(
-        $displayText, $allLevels = false, $separator = '/'
+        $displayText, $allLevels = false, $separator = '/',
+        $domain = false
     ) {
         $originalText = $displayText;
         $parts = explode('/', $displayText);
@@ -166,25 +200,89 @@ class HierarchicalFacetHelper
             } else {
                 array_shift($parts);
                 array_pop($parts);
-                $displayText = implode($separator, $parts);
+
+                if (false !== $domain) {
+                    $translatedParts = [];
+                    foreach ($parts as $part) {
+                        $translatedParts[] = $this->translate([$domain, $part]);
+                    }
+                    $displayText = new TranslatableString(
+                        implode($separator, $parts),
+                        implode($separator, $translatedParts)
+                    );
+                } else {
+                    $displayText = implode($separator, $parts);
+                }
             }
         }
         return new TranslatableString($originalText, $displayText);
     }
 
     /**
+     * Format a filter string in parts suitable for displaying or translation
+     *
+     * @param string $filter Filter value
+     *
+     * @return array
+     */
+    public function getFilterStringParts($filter)
+    {
+        $parts = explode('/', $filter);
+        if (count($parts) <= 1 || !is_numeric($parts[0])) {
+            return $filter;
+        }
+        $result = [];
+        for ($level = 0; $level <= $parts[0]; $level++) {
+            $str = $level . '/' . implode('/', array_slice($parts, 1, $level + 1))
+                . '/';
+            $result[] = new TranslatableString($str, $parts[$level + 1]);
+        }
+        return $result;
+    }
+
+    /**
+     * Check if the given value is the deepest level in the facet list.
+     *
+     * Takes into account lists with multiple top levels.
+     *
+     * @param array  $facetList Facet list
+     * @param string $value     Facet value
+     *
+     * @return bool
+     */
+    public function isDeepestFacetLevel($facetList, $value)
+    {
+        $parts = explode('/', $value);
+        $level = array_shift($parts);
+        if (!is_numeric($level)) {
+            // Not a properly formatted hierarchical facet value
+            return true;
+        }
+        $path = implode('/', array_slice($parts, 0, $level + 1));
+        foreach ($facetList as $current) {
+            $parts = explode('/', $current);
+            $currentLevel = array_shift($parts);
+            if (is_numeric($currentLevel) && $currentLevel > $level) {
+                // Check if parent is same
+                if ($path === implode('/', array_slice($parts, 0, $level + 1))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Create an item for the hierarchical facet array
      *
-     * @param string         $facet      Facet name
-     * @param array          $item       Facet item received from Solr
-     * @param UrlQueryHelper $urlHelper  UrlQueryHelper for creating facet
-     * url's
-     * @param array          $paramArray URL parameters
-     * active children
+     * @param string         $facet     Facet name
+     * @param array          $item      Facet item received from Solr
+     * @param UrlQueryHelper $urlHelper UrlQueryHelper for creating facet URLs
+     * @param bool           $escape    Whether to escape URLs
      *
      * @return array Facet item
      */
-    protected function createFacetItem($facet, $item, $urlHelper, $paramArray)
+    protected function createFacetItem($facet, $item, $urlHelper, $escape = true)
     {
         $href = '';
         $exclude = '';
@@ -192,16 +290,15 @@ class HierarchicalFacetHelper
         if ($urlHelper !== false) {
             if ($item['isApplied']) {
                 $href = $urlHelper->removeFacet(
-                    $facet, $item['value'], true, $item['operator'], $paramArray
-                );
+                    $facet, $item['value'], $item['operator']
+                )->getParams($escape);
             } else {
                 $href = $urlHelper->addFacet(
-                    $facet, $item['value'], $item['operator'], $paramArray
-                );
+                    $facet, $item['value'], $item['operator']
+                )->getParams($escape);
             }
-            $exclude = $urlHelper->addFacet(
-                $facet, $item['value'], 'NOT', $paramArray
-            );
+            $exclude = $urlHelper->addFacet($facet, $item['value'], 'NOT')
+                ->getParams($escape);
         }
 
         $displayText = $item['displayText'];
@@ -244,7 +341,7 @@ class HierarchicalFacetHelper
      *
      * @param array $list Facet list
      *
-     * @return boolean Whether any items are applied (for recursive calls)
+     * @return bool Whether any items are applied (for recursive calls)
      */
     protected function updateAppliedChildrenStatus($list)
     {

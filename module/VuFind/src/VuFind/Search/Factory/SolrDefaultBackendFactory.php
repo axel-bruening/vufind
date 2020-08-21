@@ -3,7 +3,7 @@
 /**
  * Factory for the default SOLR backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,31 +18,38 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Factory;
 
-use VuFindSearch\Backend\Solr\Response\Json\RecordCollectionFactory;
-use VuFindSearch\Backend\Solr\Connector;
 use VuFindSearch\Backend\Solr\Backend;
+use VuFindSearch\Backend\Solr\Connector;
+use VuFindSearch\Backend\Solr\Response\Json\RecordCollectionFactory;
 
 /**
  * Factory for the default SOLR backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class SolrDefaultBackendFactory extends AbstractSolrBackendFactory
 {
+    /**
+     * Method for creating a record driver.
+     *
+     * @var string
+     */
+    protected $createRecordMethod = 'getSolrRecord';
+
     /**
      * Constructor
      */
@@ -61,7 +68,7 @@ class SolrDefaultBackendFactory extends AbstractSolrBackendFactory
      */
     protected function getSolrCore()
     {
-        $config = $this->config->get('config');
+        $config = $this->config->get($this->mainConfig);
         return isset($config->Index->default_core)
             ? $config->Index->default_core : 'biblio';
     }
@@ -76,8 +83,10 @@ class SolrDefaultBackendFactory extends AbstractSolrBackendFactory
     protected function createBackend(Connector $connector)
     {
         $backend = parent::createBackend($connector);
-        $manager = $this->serviceLocator->get('VuFind\RecordDriverPluginManager');
-        $factory = new RecordCollectionFactory([$manager, 'getSolrRecord']);
+        $manager = $this->serviceLocator
+            ->get(\VuFind\RecordDriver\PluginManager::class);
+        $factory
+            = new RecordCollectionFactory([$manager, $this->createRecordMethod]);
         $backend->setRecordCollectionFactory($factory);
         return $backend;
     }

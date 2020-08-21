@@ -2,7 +2,7 @@
 /**
  * Export support class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Export
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind;
-use VuFind\SimpleXML, Zend\Config\Config;
+
+use Laminas\Config\Config;
+use Laminas\View\Renderer\RendererInterface;
 
 /**
  * Export support class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Export
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class Export
 {
@@ -74,25 +76,11 @@ class Export
     }
 
     /**
-     * Get bulk export options.
-     *
-     * @deprecated use getActiveFormats($context) instead
-     *
-     * @return array
-     */
-    public function getBulkOptions()
-    {
-        return $this->getActiveFormats('bulk');
-    }
-
-    /**
      * Get the URL for bulk export.
      *
-     * @param \Zend\View\Renderer\RendererInterface $view   View object (needed for
-     * URL generation)
-     * @param string                                $format Export format being used
-     * @param array                                 $ids    Array of IDs to export
-     * (in source|id format)
+     * @param RendererInterface $view   View object (needed for URL generation)
+     * @param string            $format Export format being used
+     * @param array             $ids    Array of IDs to export (in source|id format)
      *
      * @return string
      */
@@ -159,7 +147,8 @@ class Export
      */
     public function needsRedirect($format)
     {
-        return isset($this->exportConfig->$format->redirectUrl);
+        return !empty($this->exportConfig->$format->redirectUrl)
+            && 'link' === $this->getBulkExportType($format);
     }
 
     /**
@@ -383,5 +372,32 @@ class Export
             $this->activeFormats[$context] = array_unique($active);
         }
         return $this->activeFormats[$context];
+    }
+
+    /**
+     * Get the export POST field name.
+     *
+     * @param string $format Format identifier
+     *
+     * @return string
+     */
+    public function getPostField($format)
+    {
+        return !empty($this->exportConfig->$format->postField)
+            ? $this->exportConfig->$format->postField : 'ImportData';
+    }
+
+    /**
+     * Get the export target window.
+     *
+     * @param string $format Format identifier
+     *
+     * @return string
+     */
+    public function getTargetWindow($format)
+    {
+        return !empty($this->exportConfig->$format->targetWindow)
+            ? $this->exportConfig->$format->targetWindow
+            : $format . 'Main';
     }
 }

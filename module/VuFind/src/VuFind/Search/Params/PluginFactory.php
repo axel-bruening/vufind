@@ -2,7 +2,7 @@
 /**
  * Search params plugin factory
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\Search\Params;
-use Zend\ServiceManager\ServiceLocatorInterface;
+
+use Interop\Container\ContainerInterface;
 
 /**
  * Search params plugin factory
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 class PluginFactory extends \VuFind\ServiceManager\AbstractPluginFactory
 {
@@ -51,22 +52,23 @@ class PluginFactory extends \VuFind\ServiceManager\AbstractPluginFactory
     /**
      * Create a service for the specified name.
      *
-     * @param ServiceLocatorInterface $serviceLocator Service locator
-     * @param string                  $name           Name of service
-     * @param string                  $requestedName  Unfiltered name of service
+     * @param ContainerInterface $container     Service container
+     * @param string             $requestedName Name of service
+     * @param array              $extras        Extra options
      *
      * @return object
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function createServiceWithName(ServiceLocatorInterface $serviceLocator,
-        $name, $requestedName
+    public function __invoke(ContainerInterface $container, $requestedName,
+        array $extras = null
     ) {
-        $options = $serviceLocator->getServiceLocator()
-            ->get('VuFind\SearchOptionsPluginManager')->get($requestedName);
-        $class = $this->getClassName($name, $requestedName);
+        $optionsService = preg_replace('/Params$/', 'Options', $requestedName);
+        $options = $container->get(\VuFind\Search\Options\PluginManager::class)
+            ->get($optionsService);
+        $class = $this->getClassName($requestedName);
+        $configLoader = $container->get(\VuFind\Config\PluginManager::class);
         // Clone the options instance in case caller modifies it:
-        return new $class(
-            clone($options),
-            $serviceLocator->getServiceLocator()->get('VuFind\Config')
-        );
+        return new $class(clone $options, $configLoader, ...($extras ?: []));
     }
 }

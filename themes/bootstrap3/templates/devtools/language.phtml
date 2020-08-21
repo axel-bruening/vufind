@@ -1,4 +1,4 @@
-<?
+<?php
     $this->headTitle($this->translate('Language'));
 ?>
 
@@ -8,49 +8,63 @@
 
 <table class="table table-striped">
   <tr><th>Language</th><th>Missing Lines</th><th>Extra Lines</th><th>Percent Translated</th><th>Extra Help Files</th></tr>
-  <? foreach ($details as $langCode => $diffs): ?>
+  <?php foreach ($details as $langCode => $diffs): ?>
+    <?php
+      $extraCount = count($diffs['notInL1']);
+      $missingCount = count($diffs['notInL2']);
+    ?>
     <tr>
       <td><?=$this->escapeHtml($langCode . ' (' . $diffs['name'] . ')')?></td>
-      <td><?=count($diffs['notInL2'])?></td>
-      <td><?=count($diffs['notInL1'])?></td>
+      <td><?=$missingCount ?><?php if($missingCount > 0): ?> (<button class="missing_count btn btn-link" data-langcode="<?=$langCode?>" href="#"><?=$this->transEsc('show') ?></button>)<?php endif; ?></td>
+      <td><?=$extraCount ?><?php if($extraCount > 0): ?> (<button class="extra_count btn btn-link" data-langcode="<?=$langCode?>" href="#"><?=$this->transEsc('show') ?></button>)<?php endif; ?></td>
       <td><?=$this->escapeHtml($diffs['l2Percent'])?></td>
       <td><?=count($diffs['helpFiles'])?></td>
     </tr>
-  <? endforeach; ?>
+  <?php endforeach; ?>
 </table>
-<div class="accordion" id="accordion">
-  <? foreach ($details as $langCode => $diffs): ?>
-    <? if (count($diffs['notInL1']) > 0): ?>
-      <div class="accordion-group">
-        <div class="accordion-heading">
-          <a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion" href="#extra_<?=$langCode ?>">
-            Extra Lines In <?=$this->escapeHtml($diffs['name'])?> (<?=$this->escapeHtml($langCode)?>.ini)
-          </a>
-        </div>
-        <div id="extra_<?=$langCode ?>" class="accordion-body collapse">
-          <div class="accordion-inner">
-          <? foreach ($diffs['notInL1'] as $key): ?>
-            <?=$this->escapeHtml($key)?> = "<?=$this->escapeHtml($diffs['object'][$key])?>"<br />
-          <? endforeach; ?>
-          </div>
-        </div>
-      </div>
-    <? endif; ?>
-    <? if (count($diffs['notInL2']) > 0): ?>
-      <div class="accordion-group">
-        <div class="accordion-heading">
-          <a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion" href="#missing_<?=$langCode ?>">
-            Missing From <?=$this->escapeHtml($diffs['name'])?> (<?=$this->escapeHtml($langCode)?>.ini)
-            <span class="pull-right flip"></span>
-          </a>
-        </div>
-        <div id="missing_<?=$langCode ?>" class="accordion-body collapse">
-          <div class="accordion-inner">
-            <textarea class="form-control" rows="15"><? foreach ($diffs['notInL2'] as $key): ?><?=$this->escapeHtml($key)?> = "<?=$this->escapeHtml($main[$key])?>"
-<? endforeach; ?></textarea>
-          </div>
-        </div>
-      </div>
-    <? endif; ?>
-  <? endforeach; ?>
-</div>
+<?php
+  $json = json_encode($details);
+  $script = <<<JS
+  function createDiffManager() {
+    var details = {$json};
+    function makeRow(opArray, lang) {
+      var arr = [];
+      for (var i = 0; i < opArray.length; i++) {
+        console.log(details[lang].object[opArray[i]] || details.en.object[opArray[i]]);
+        arr.push(opArray[i] + ' = "' + (details[lang].object[opArray[i]] || details.en.object[opArray[i]]) + '"');
+      }
+      return '<textarea class="translation-output form-control" rows="' + Math.min(arr.length + 1, 25)+ '">' + arr.join('\\n') + '</textarea>';
+    }
+    function bindTextareaEvent() {
+       $('.translation-output').click(function(e) {
+        this.select();
+      });
+    }
+    function showExtra(lang) {
+      VuFind.lightbox.render('<h2>Extra Lines</h2>'+makeRow(details[lang].notInL1, lang));
+      bindTextareaEvent();
+      return false;
+    }
+    function showMissing(lang) {
+      VuFind.lightbox.render('<h2>Missing Lines</h2>'+makeRow(details[lang].notInL2, lang));
+      bindTextareaEvent();
+      return false;
+    }
+    return {
+      showExtra: showExtra,
+      showMissing: showMissing
+    }
+  }
+  var diffManager = createDiffManager();
+  
+  $('.missing_count').click(function(e) {
+    lang = $(this).data('langcode');
+    return diffManager.showMissing(lang);
+  });
+  $('.extra_count').click(function(e) {
+    lang = $(this).data('langcode');
+    return diffManager.showExtra(lang);
+  });
+JS;
+?>
+<?=$this->inlineScript(\Laminas\View\Helper\HeadScript::SCRIPT, $script, 'SET') ?>

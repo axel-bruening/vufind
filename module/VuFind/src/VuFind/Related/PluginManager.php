@@ -2,7 +2,7 @@
 /**
  * Related record plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,41 +17,71 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Related_Records
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_a_related_record_module Wiki
+ * @link     https://vufind.org/wiki/development:plugins:related_records_modules Wiki
  */
 namespace VuFind\Related;
-use Zend\ServiceManager\ConfigInterface;
+
+use Laminas\ServiceManager\Factory\InvokableFactory;
 
 /**
  * Related record plugin manager
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Related_Records
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_a_related_record_module Wiki
+ * @link     https://vufind.org/wiki/development:plugins:related_records_modules Wiki
  */
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'channels' => Channels::class,
+        'editions' => Deprecated::class,
+        'similar' => Similar::class,
+        'worldcateditions' => Deprecated::class,
+        'worldcatsimilar' => WorldCatSimilar::class,
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        Channels::class => InvokableFactory::class,
+        Deprecated::class => InvokableFactory::class,
+        Similar::class => SimilarFactory::class,
+        WorldCatSimilar::class => SimilarFactory::class,
+    ];
+
+    /**
      * Constructor
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
-        // These plugins are not meant to be shared -- the same module may be used
-        // multiple times with different configurations, so we need to build a new
-        // copy each time the plugin is retrieved.
-        $this->setShareByDefault(false);
-
-        parent::__construct($configuration);
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
+        // These objects are not meant to be shared -- every time we retrieve one,
+        // we are building a brand new object.
+        $this->sharedByDefault = false;
+        $this->addAbstractFactory(PluginFactory::class);
+        parent::__construct($configOrContainerInstance, $v3config);
     }
 
     /**
@@ -62,6 +92,6 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      */
     protected function getExpectedInterface()
     {
-        return 'VuFind\Related\RelatedInterface';
+        return RelatedInterface::class;
     }
 }

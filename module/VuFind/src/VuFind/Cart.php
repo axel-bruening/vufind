@@ -2,7 +2,7 @@
 /**
  * Cart Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,15 +17,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Cart
  * @author   Tuan Nguyen <tuan@yorku.ca>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind;
+
 use VuFind\Cookie\CookieManager;
 
 /**
@@ -33,11 +34,11 @@ use VuFind\Cookie\CookieManager;
  *
  * The data model object representing a user's book cart.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Cart
  * @author   Tuan Nguyen <tuan@yorku.ca>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Cart
 {
@@ -63,6 +64,13 @@ class Cart
     protected $active;
 
     /**
+     * Is cart configured to toggles in search results?
+     *
+     * @var bool
+     */
+    protected $showTogglesInSearch;
+
+    /**
      * Record loader
      *
      * @var \VuFind\Record\Loader
@@ -76,26 +84,29 @@ class Cart
      */
     protected $cookieManager;
 
-    const CART_COOKIE =  'vufind_cart';
+    const CART_COOKIE = 'vufind_cart';
     const CART_COOKIE_SOURCES = 'vufind_cart_src';
     const CART_COOKIE_DELIM = "\t";
 
     /**
      * Constructor
      *
-     * @param \VuFind\Record\Loader $loader        Object for loading records
-     * @param CookieManager         $cookieManager Cookie manager
-     * @param int                   $maxSize       Maximum size of cart contents
-     * @param bool                  $active        Is cart enabled?
+     * @param \VuFind\Record\Loader $loader          Object for loading records
+     * @param CookieManager         $cookieManager   Cookie manager
+     * @param int                   $maxSize         Maximum size of cart contents
+     * @param bool                  $active          Is cart enabled?
+     * @param bool                  $togglesInSearch Is cart configured to toggles
+     * in search results?
      */
     public function __construct(\VuFind\Record\Loader $loader,
         \VuFind\Cookie\CookieManager $cookieManager,
-        $maxSize = 100, $active = true
+        $maxSize = 100, $active = true, $togglesInSearch = true
     ) {
         $this->recordLoader = $loader;
         $this->cookieManager = $cookieManager;
         $this->maxSize = $maxSize;
         $this->active = $active;
+        $this->showTogglesInSearch = $togglesInSearch;
 
         // Initialize contents
         $this->init($this->cookieManager->getCookies());
@@ -205,7 +216,7 @@ class Cart
      */
     public function isFull()
     {
-        return (count($this->items) >= $this->maxSize);
+        return count($this->items) >= $this->maxSize;
     }
 
     /**
@@ -229,6 +240,16 @@ class Cart
     }
 
     /**
+     * Process parameters and return the cart content.
+     *
+     * @return bool
+     */
+    public function isActiveInSearch()
+    {
+        return $this->active && $this->showTogglesInSearch;
+    }
+
+    /**
      * Initialize the cart model.
      *
      * @param array $cookies Current cookie values
@@ -244,9 +265,9 @@ class Cart
 
             if (!isset($cookies[self::CART_COOKIE_SOURCES])) {
                 // Backward compatibility with VuFind 1.x -- if no source cookie, all
-                // items come from the VuFind source:
+                // items come from the default source:
                 for ($i = 0; $i < count($items); $i++) {
-                    $items[$i] = 'VuFind|' . $items[$i];
+                    $items[$i] = DEFAULT_SEARCH_BACKEND . '|' . $items[$i];
                 }
             } else {
                 // Default case for VuFind 2.x carts -- decompress source data:
@@ -291,9 +312,9 @@ class Cart
 
         // Save the cookies:
         $cookie = implode(self::CART_COOKIE_DELIM, $ids);
-        $this->cookieManager->set(self::CART_COOKIE, $cookie, 0);
+        $this->cookieManager->set(self::CART_COOKIE, $cookie, 0, false);
         $srcCookie = implode(self::CART_COOKIE_DELIM, $sources);
-        $this->cookieManager->set(self::CART_COOKIE_SOURCES, $srcCookie, 0);
+        $this->cookieManager->set(self::CART_COOKIE_SOURCES, $srcCookie, 0, false);
     }
 
     /**
@@ -304,6 +325,26 @@ class Cart
     public function getCookieDomain()
     {
         return $this->cookieManager->getDomain();
+    }
+
+    /**
+     * Get cookie path ('/' if unset).
+     *
+     * @return string
+     */
+    public function getCookiePath()
+    {
+        return $this->cookieManager->getPath();
+    }
+
+    /**
+     * Get cookie SameSite attribute (null if unset).
+     *
+     * @return string
+     */
+    public function getCookieSameSite()
+    {
+        return $this->cookieManager->getSameSite();
     }
 
     /**

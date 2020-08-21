@@ -2,7 +2,7 @@
 /**
  * Hierarchy Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_a_controller Wiki
+ * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
 namespace VuFind\Controller;
 
 /**
  * Hierarchy Controller
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_a_controller Wiki
+ * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
 class HierarchyController extends AbstractBase
 {
@@ -43,7 +43,7 @@ class HierarchyController extends AbstractBase
      *
      * @param string $xml XML to output
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     protected function output($xml)
     {
@@ -60,7 +60,7 @@ class HierarchyController extends AbstractBase
      * @param string $json   A JSON string
      * @param int    $status Response status code
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     protected function outputJSON($json, $status = 200)
     {
@@ -76,21 +76,23 @@ class HierarchyController extends AbstractBase
      * Search the tree and echo a json result of items that
      * matched the keywords.
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     public function searchtreeAction()
     {
-        $this->writeSession();  // avoid session write timing bug
+        $this->disableSessionWrites();  // avoid session write timing bug
         $config = $this->getConfig();
         $limit = isset($config->Hierarchy->treeSearchLimit)
             ? $config->Hierarchy->treeSearchLimit : -1;
         $resultIDs = [];
         $hierarchyID = $this->params()->fromQuery('hierarchyID');
+        $source = $this->params()
+            ->fromQuery('hierarchySource', DEFAULT_SEARCH_BACKEND);
         $lookfor = $this->params()->fromQuery('lookfor', '');
         $searchType = $this->params()->fromQuery('type', 'AllFields');
 
-        $results = $this->getServiceLocator()
-            ->get('VuFind\SearchResultsPluginManager')->get('Solr');
+        $results = $this->serviceLocator
+            ->get(\VuFind\Search\Results\PluginManager::class)->get($source);
         $results->getParams()->setBasicSearch($lookfor, $searchType);
         $results->getParams()->addFilter('hierarchy_top_id:' . $hierarchyID);
         $facets = $results->getFullFieldFacets(['id'], false, $limit + 1);
@@ -117,12 +119,14 @@ class HierarchyController extends AbstractBase
      */
     public function gettreeAction()
     {
-        $this->writeSession();  // avoid session write timing bug
+        $this->disableSessionWrites();  // avoid session write timing bug
         // Retrieve the record from the index
         $id = $this->params()->fromQuery('id');
-        $loader = $this->getServiceLocator()->get('VuFind\RecordLoader');
+        $source = $this->params()
+            ->fromQuery('hierarchySource', DEFAULT_SEARCH_BACKEND);
+        $loader = $this->getRecordLoader();
         try {
-            if ($recordDriver = $loader->load($id)) {
+            if ($recordDriver = $loader->load($id, $source)) {
                 $results = $recordDriver->getHierarchyDriver()->render(
                     $recordDriver,
                     $this->params()->fromQuery('context'),
@@ -150,12 +154,14 @@ class HierarchyController extends AbstractBase
      */
     public function gettreejsonAction()
     {
-        $this->writeSession();  // avoid session write timing bug
+        $this->disableSessionWrites();  // avoid session write timing bug
         // Retrieve the record from the index
         $id = $this->params()->fromQuery('id');
-        $loader = $this->getServiceLocator()->get('VuFind\RecordLoader');
+        $source = $this->params()
+            ->fromQuery('hierarchySource', DEFAULT_SEARCH_BACKEND);
+        $loader = $this->getRecordLoader();
         try {
-            if ($recordDriver = $loader->load($id)) {
+            if ($recordDriver = $loader->load($id, $source)) {
                 $results = $recordDriver->getHierarchyDriver()
                     ->getTreeRenderer($recordDriver)->getJSON(
                         $this->params()->fromQuery('hierarchyID'),
@@ -183,9 +189,11 @@ class HierarchyController extends AbstractBase
     public function getrecordAction()
     {
         $id = $this->params()->fromQuery('id');
-        $loader = $this->getServiceLocator()->get('VuFind\RecordLoader');
+        $source = $this->params()
+            ->fromQuery('hierarchySource', DEFAULT_SEARCH_BACKEND);
+        $loader = $this->getRecordLoader();
         try {
-            $record = $loader->load($id);
+            $record = $loader->load($id, $source);
             $result = $this->getViewRenderer()->record($record)
                 ->getCollectionBriefRecord();
         } catch (\VuFind\Exception\RecordMissing $e) {

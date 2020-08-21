@@ -2,7 +2,7 @@
 /**
  * Authority Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,40 +17,44 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Controller;
+
+use Laminas\ServiceManager\ServiceLocatorInterface;
 
 /**
  * Authority Controller
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class AuthorityController extends AbstractSearch
 {
     /**
      * Constructor
+     *
+     * @param ServiceLocatorInterface $sm Service locator
      */
-    public function __construct()
+    public function __construct(ServiceLocatorInterface $sm)
     {
         $this->searchClassId = 'SolrAuth';
-        parent::__construct();
+        parent::__construct($sm);
     }
 
     /**
      * Home action
      *
-     * @return \Zend\View\Model\ViewModel
+     * @return \Laminas\View\Model\ViewModel
      */
     public function homeAction()
     {
@@ -60,26 +64,22 @@ class AuthorityController extends AbstractSearch
             return $this->forwardTo('Authority', 'Record');
         }
 
-        // Do nothing -- just display template
-        return $this->createViewModel();
+        // Default behavior:
+        return parent::homeAction();
     }
 
     /**
      * Record action -- display a record
      *
-     * @return \Zend\View\Model\ViewModel
+     * @return \Laminas\View\Model\ViewModel
      */
     public function recordAction()
     {
         $id = $this->params()->fromQuery('id');
-        $cfg = $this->getServiceLocator()->get('Config');
-        $tabConfig = $cfg['vufind']['recorddriver_tabs'];
-        $driver = $this->getServiceLocator()->get('VuFind\RecordLoader')
+        $driver = $this->serviceLocator->get(\VuFind\Record\Loader::class)
             ->load($id, 'SolrAuth');
         $request = $this->getRequest();
-        $tabs = $this->getServiceLocator()
-            ->get('VuFind\RecordTabPluginManager')
-            ->getTabsForRecord($driver, $tabConfig, $request);
+        $tabs = $this->getRecordTabManager()->getTabsForRecord($driver, $request);
         return $this->createViewModel(['driver' => $driver, 'tabs' => $tabs]);
     }
 
@@ -93,4 +93,3 @@ class AuthorityController extends AbstractSearch
         return $this->resultsAction();
     }
 }
-

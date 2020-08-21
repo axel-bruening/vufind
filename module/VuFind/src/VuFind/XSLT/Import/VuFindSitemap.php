@@ -2,7 +2,7 @@
 /**
  * XSLT importer support methods for sitemaps.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (c) Demian Katz 2010.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Import_Tools
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/importing_records Wiki
+ * @link     https://vufind.org/wiki/indexing Wiki
  */
 namespace VuFind\XSLT\Import;
 
@@ -32,11 +32,11 @@ namespace VuFind\XSLT\Import;
  * they will be automatically made available to your XSL stylesheet for use
  * with the php:function() function.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Import_Tools
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/importing_records Wiki
+ * @link     https://vufind.org/wiki/indexing Wiki
  */
 class VuFindSitemap extends VuFind
 {
@@ -174,7 +174,7 @@ class VuFindSitemap extends VuFind
         preg_match_all(
             '/<meta name="useCount" content="([^"]*)"/ms', $html, $matches
         );
-        $useCount = isset($matches[1][0]) ? $matches[1][0] : 1;
+        $useCount = $matches[1][0] ?? 1;
 
         return [
             'category' => $categories,

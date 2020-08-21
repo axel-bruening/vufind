@@ -3,7 +3,7 @@
  * This is a helper that lets the layout know whether or not to include the feedback
  * tab
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,13 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Root;
 
@@ -32,13 +32,13 @@ namespace VuFind\View\Helper\Root;
  * This is a helper that lets the layout know whether or not to include the feedback
  * tab
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Josiah Knoll <jk1135@ship.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
-class Feedback extends \Zend\View\Helper\AbstractHelper
+class Feedback extends \Laminas\View\Helper\AbstractHelper
 {
     /**
      * Is the tab enabled?
@@ -60,7 +60,7 @@ class Feedback extends \Zend\View\Helper\AbstractHelper
     /**
      * This will retrieve the config for whether or not the tab is enabled.
      *
-     * @return boolean
+     * @return bool
      */
     public function tabEnabled()
     {

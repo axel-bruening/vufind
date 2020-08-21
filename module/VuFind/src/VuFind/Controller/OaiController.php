@@ -2,7 +2,7 @@
 /**
  * OAI Module Controller
  *
- * PHP Version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,33 +17,35 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_a_controller Wiki
+ * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
 namespace VuFind\Controller;
+
+use VuFindApi\Formatter\RecordFormatter;
 
 /**
  * OAIController Class
  *
  * Controls the OAI server
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_a_controller Wiki
+ * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
 class OaiController extends AbstractBase
 {
     /**
      * Display OAI server form.
      *
-     * @return \Zend\View\Model\ViewModel
+     * @return \Laminas\View\Model\ViewModel
      */
     public function homeAction()
     {
@@ -54,7 +56,7 @@ class OaiController extends AbstractBase
     /**
      * Standard OAI server.
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     public function authserverAction()
     {
@@ -64,7 +66,7 @@ class OaiController extends AbstractBase
     /**
      * Standard OAI server.
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     public function serverAction()
     {
@@ -76,7 +78,7 @@ class OaiController extends AbstractBase
      *
      * @param string $serverClass Class to load for handling OAI requests.
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     protected function handleOAI($serverClass)
     {
@@ -99,14 +101,13 @@ class OaiController extends AbstractBase
                 $this->getRequest()->getQuery()->toArray(),
                 $this->getRequest()->getPost()->toArray()
             );
-            $server = new $serverClass(
-                $this->getServiceLocator()->get('VuFind\SearchResultsPluginManager'),
-                $this->getServiceLocator()->get('VuFind\RecordLoader'),
-                $this->getServiceLocator()->get('VuFind\DbTablePluginManager'),
-                $config, $baseURL, $params
-            );
+            $server = $this->serviceLocator->get($serverClass);
+            $server->init($config, $baseURL, $params);
             $server->setRecordLinkHelper(
-                $this->getViewRenderer()->plugin('recordlink')
+                $this->getViewRenderer()->plugin('recordLink')
+            );
+            $server->setRecordFormatter(
+                $this->serviceLocator->get(RecordFormatter::class)
             );
             $xml = $server->getResponse();
         } catch (\Exception $e) {

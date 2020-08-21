@@ -2,7 +2,7 @@
 /**
  * Database authentication test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Auth;
+
 use VuFind\Auth\Database;
 
 /**
  * Database authentication test class.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class DatabaseTest extends \VuFindTest\Unit\DbTestCase
 {
@@ -51,11 +52,11 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
     /**
      * Standard setup method.
      *
-     * @return mixed
+     * @return void
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
-        return static::failIfUsersExist();
+        static::failIfUsersExist();
     }
 
     /**
@@ -63,11 +64,12 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
         // Give up if we're not running in CI:
         if (!$this->continuousIntegrationRunning()) {
-            return $this->markTestSkipped('Continuous integration not running.');
+            $this->markTestSkipped('Continuous integration not running.');
+            return;
         }
         $this->auth = $this->getAuthManager()->get('Database');
     }
@@ -88,12 +90,12 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      *
      * @param array $post Associative array of POST parameters.
      *
-     * @return \Zend\Http\Request
+     * @return \Laminas\Http\Request
      */
     protected function getRequest($post)
     {
-        $request = new \Zend\Http\Request();
-        $request->setPost(new \Zend\Stdlib\Parameters($post));
+        $request = new \Laminas\Http\Request();
+        $request->setPost(new \Laminas\Stdlib\Parameters($post));
         return $request;
     }
 
@@ -103,7 +105,7 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      *
      * @param array $overrides Associative array of parameters to override.
      *
-     * @return \Zend\Http\Request
+     * @return \Laminas\Http\Request
      */
     protected function getAccountCreationRequest($overrides = [])
     {
@@ -121,7 +123,7 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      *
      * @param array $overrides Associative array of parameters to override.
      *
-     * @return \Zend\Http\Request
+     * @return \Laminas\Http\Request
      */
     protected function getLoginRequest($overrides = [])
     {
@@ -138,7 +140,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreationWithBlankUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getAccountCreationRequest(['username' => '']);
         $this->auth->create($request);
     }
@@ -150,7 +153,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreationWithBlankPassword()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getAccountCreationRequest(['password' => '']);
         $this->auth->create($request);
     }
@@ -162,7 +166,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreationWithPasswordMismatch()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getAccountCreationRequest(['password2' => '']);
         $this->auth->create($request);
     }
@@ -174,20 +179,27 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreationWithInvalidEmail()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getAccountCreationRequest(['email' => 'garbage']);
         $this->auth->create($request);
     }
 
     /**
-     * Test password mismatch.
+     * Test successful account creation.
      *
      * @return void
      */
     public function testSuccessfulCreation()
     {
         $request = $this->getAccountCreationRequest();
-        $this->auth->create($request);
+        $newUser = $this->auth->create($request)->toArray();
+        foreach ($request->getPost() as $key => $value) {
+            // Skip the password confirmation value!
+            if ($key !== 'password2') {
+                $this->assertEquals($value, $newUser[$key]);
+            }
+        }
     }
 
     /**
@@ -197,7 +209,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreationWithDuplicateUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getAccountCreationRequest(['email' => 'user2@test.com']);
         $this->auth->create($request);
     }
@@ -209,7 +222,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreationWithDuplicateEmail()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getAccountCreationRequest(['username' => 'testuser2']);
         $this->auth->create($request);
     }
@@ -221,7 +235,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['username' => '']);
         $this->auth->authenticate($request);
     }
@@ -233,7 +248,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankPassword()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['password' => '']);
         $this->auth->authenticate($request);
     }
@@ -245,7 +261,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithUnrecognizedUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['username' => 'unknown']);
         $this->auth->authenticate($request);
     }
@@ -257,7 +274,8 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBadPassword()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['password' => "' OR 1=1 LIMIT 1"]);
         $this->auth->authenticate($request);
     }
@@ -279,7 +297,7 @@ class DatabaseTest extends \VuFindTest\Unit\DbTestCase
      *
      * @return void
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
         static::removeUsers('testuser');
     }

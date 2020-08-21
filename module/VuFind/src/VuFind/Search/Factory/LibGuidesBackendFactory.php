@@ -3,7 +3,7 @@
 /**
  * Factory for LibGuides backends.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,71 +18,76 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Factory;
 
-use VuFindSearch\Backend\LibGuides\Connector;
-use VuFindSearch\Backend\BackendInterface;
-use VuFindSearch\Backend\LibGuides\Response\RecordCollectionFactory;
-use VuFindSearch\Backend\LibGuides\QueryBuilder;
-use VuFindSearch\Backend\LibGuides\Backend;
+use Interop\Container\ContainerInterface;
 
-use Zend\ServiceManager\ServiceLocatorInterface;
-use Zend\ServiceManager\FactoryInterface;
+use Laminas\ServiceManager\Factory\FactoryInterface;
+use VuFindSearch\Backend\LibGuides\Backend;
+use VuFindSearch\Backend\LibGuides\Connector;
+use VuFindSearch\Backend\LibGuides\QueryBuilder;
+
+use VuFindSearch\Backend\LibGuides\Response\RecordCollectionFactory;
 
 /**
  * Factory for LibGuides backends.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class LibGuidesBackendFactory implements FactoryInterface
 {
     /**
      * Logger.
      *
-     * @var Zend\Log\LoggerInterface
+     * @var \Laminas\Log\LoggerInterface
      */
     protected $logger;
 
     /**
      * Superior service manager.
      *
-     * @var ServiceLocatorInterface
+     * @var ContainerInterface
      */
     protected $serviceLocator;
 
     /**
      * LibGuides configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $libGuidesConfig;
 
     /**
-     * Create the backend.
+     * Create service
      *
-     * @param ServiceLocatorInterface $serviceLocator Superior service manager
+     * @param ContainerInterface $sm      Service manager
+     * @param string             $name    Requested service name (unused)
+     * @param array              $options Extra options (unused)
      *
-     * @return BackendInterface
+     * @return Backend
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function createService(ServiceLocatorInterface $serviceLocator)
+    public function __invoke(ContainerInterface $sm, $name, array $options = null)
     {
-        $this->serviceLocator = $serviceLocator;
-        $configReader = $this->serviceLocator->get('VuFind\Config');
+        $this->serviceLocator = $sm;
+        $configReader = $this->serviceLocator
+            ->get(\VuFind\Config\PluginManager::class);
         $this->libGuidesConfig = $configReader->get('LibGuides');
-        if ($this->serviceLocator->has('VuFind\Logger')) {
-            $this->logger = $this->serviceLocator->get('VuFind\Logger');
+        if ($this->serviceLocator->has(\VuFind\Log\Logger::class)) {
+            $this->logger = $this->serviceLocator->get(\VuFind\Log\Logger::class);
         }
         $connector = $this->createConnector();
         $backend   = $this->createBackend($connector);
@@ -98,8 +103,7 @@ class LibGuidesBackendFactory implements FactoryInterface
      */
     protected function createBackend(Connector $connector)
     {
-        $defaultSearch = isset($this->libGuidesConfig->General->defaultSearch)
-            ? $this->libGuidesConfig->General->defaultSearch : null;
+        $defaultSearch = $this->libGuidesConfig->General->defaultSearch ?? null;
         $backend = new Backend(
             $connector, $this->createRecordCollectionFactory(), $defaultSearch
         );
@@ -116,19 +120,20 @@ class LibGuidesBackendFactory implements FactoryInterface
     protected function createConnector()
     {
         // Load credentials:
-        $iid = isset($this->libGuidesConfig->General->iid)
-            ? $this->libGuidesConfig->General->iid : null;
+        $iid = $this->libGuidesConfig->General->iid ?? null;
 
         // Pick version:
-        $ver = isset($this->libGuidesConfig->General->version)
-            ? $this->libGuidesConfig->General->version : 1;
+        $ver = $this->libGuidesConfig->General->version ?? 1;
+
+        // Get base URI, if available:
+        $baseUrl = $this->libGuidesConfig->General->baseUrl ?? null;
 
         // Build HTTP client:
-        $client = $this->serviceLocator->get('VuFind\Http')->createClient();
-        $timeout = isset($this->libGuidesConfig->General->timeout)
-            ? $this->libGuidesConfig->General->timeout : 30;
+        $client = $this->serviceLocator->get(\VuFindHttp\HttpService::class)
+            ->createClient($baseUrl);
+        $timeout = $this->libGuidesConfig->General->timeout ?? 30;
         $client->setOptions(['timeout' => $timeout]);
-        $connector = new Connector($iid, $client, $ver);
+        $connector = new Connector($iid, $client, $ver, $baseUrl);
         $connector->setLogger($this->logger);
         return $connector;
     }
@@ -151,7 +156,8 @@ class LibGuidesBackendFactory implements FactoryInterface
      */
     protected function createRecordCollectionFactory()
     {
-        $manager = $this->serviceLocator->get('VuFind\RecordDriverPluginManager');
+        $manager = $this->serviceLocator
+            ->get(\VuFind\RecordDriver\PluginManager::class);
         $callback = function ($data) use ($manager) {
             $driver = $manager->get('LibGuides');
             $driver->setRawData($data);

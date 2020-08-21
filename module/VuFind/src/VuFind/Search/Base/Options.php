@@ -2,7 +2,7 @@
 /**
  * Abstract options search model.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Base
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\Base;
-use VuFind\I18n\Translator\TranslatorAwareInterface,
-    Zend\Session\Container as SessionContainer;
+
+use Laminas\Config\Config;
+use VuFind\I18n\Translator\TranslatorAwareInterface;
 
 /**
  * Abstract options search model.
  *
  * This abstract class defines the option methods for modeling a search in VuFind.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Base
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 abstract class Options implements TranslatorAwareInterface
 {
@@ -50,6 +51,13 @@ abstract class Options implements TranslatorAwareInterface
      * @var array
      */
     protected $sortOptions = [];
+
+    /**
+     * Available sort options for facets
+     *
+     * @var array
+     */
+    protected $facetSortOptions = [];
 
     /**
      * Overall default sort option
@@ -143,6 +151,27 @@ abstract class Options implements TranslatorAwareInterface
     protected $viewOptions = [];
 
     /**
+     * Default delimiter used for delimited facets
+     *
+     * @var string
+     */
+    protected $defaultFacetDelimiter;
+
+    /**
+     * Facet settings
+     *
+     * @var array
+     */
+    protected $delimitedFacets = [];
+
+    /**
+     * Convenient field => delimiter lookup array derived from $delimitedFacets.
+     *
+     * @var array
+     */
+    protected $processedDelimitedFacets = null;
+
+    /**
      * Facet settings
      *
      * @var array
@@ -199,6 +228,20 @@ abstract class Options implements TranslatorAwareInterface
     protected $autocompleteEnabled = false;
 
     /**
+     * Autocomplete auto submit setting
+     *
+     * @var bool
+     */
+    protected $autocompleteAutoSubmit = true;
+
+    /**
+     * Configuration file to read global settings from
+     *
+     * @var string
+     */
+    protected $mainIni = 'config';
+
+    /**
      * Configuration file to read search settings from
      *
      * @var string
@@ -211,6 +254,13 @@ abstract class Options implements TranslatorAwareInterface
      * @var string
      */
     protected $facetsIni = 'facets';
+
+    /**
+     * Active list view option (see [List] in searches.ini).
+     *
+     * @var string
+     */
+    protected $listviewOption = "full";
 
     /**
      * Configuration loader
@@ -227,6 +277,13 @@ abstract class Options implements TranslatorAwareInterface
     protected $resultLimit = -1;
 
     /**
+     * Is the first/last navigation scroller enabled?
+     *
+     * @var bool
+     */
+    protected $firstlastNavigation = false;
+
+    /**
      * Constructor
      *
      * @param \VuFind\Config\PluginManager $configLoader Config loader
@@ -235,6 +292,20 @@ abstract class Options implements TranslatorAwareInterface
     {
         $this->limitOptions = [$this->defaultLimit];
         $this->setConfigLoader($configLoader);
+
+        $id = $this->getSearchClassId();
+        $facetSettings = $configLoader->get($this->facetsIni);
+        if (isset($facetSettings->AvailableFacetSortOptions[$id])) {
+            foreach ($facetSettings->AvailableFacetSortOptions[$id]->toArray()
+                     as $facet => $sortOptions
+            ) {
+                $this->facetSortOptions[$facet] = [];
+                foreach (explode(',', $sortOptions) as $fieldAndLabel) {
+                    list($field, $label) = explode('=', $fieldAndLabel);
+                    $this->facetSortOptions[$facet][$field] = $label;
+                }
+            }
+        }
     }
 
     /**
@@ -364,6 +435,17 @@ abstract class Options implements TranslatorAwareInterface
     }
 
     /**
+     * Get the name of the ini file used for loading primary settings in this
+     * object.
+     *
+     * @return string
+     */
+    public function getMainIni()
+    {
+        return $this->mainIni;
+    }
+
+    /**
      * Get the name of the ini file used for configuring search parameters in this
      * object.
      *
@@ -402,6 +484,18 @@ abstract class Options implements TranslatorAwareInterface
     public function getSortOptions()
     {
         return $this->sortOptions;
+    }
+
+    /**
+     * Get an array of sort options for a facet.
+     *
+     * @param string $facet Facet
+     *
+     * @return array
+     */
+    public function getFacetSortOptions($facet = '*')
+    {
+        return $this->facetSortOptions[$facet] ?? $this->facetSortOptions['*'] ?? [];
     }
 
     /**
@@ -464,6 +558,71 @@ abstract class Options implements TranslatorAwareInterface
     }
 
     /**
+     * Returns the defaultFacetDelimiter value.
+     *
+     * @return string
+     */
+    public function getDefaultFacetDelimiter()
+    {
+        return $this->defaultFacetDelimiter;
+    }
+
+    /**
+     * Set the defaultFacetDelimiter value.
+     *
+     * @param string $defaultFacetDelimiter A default delimiter to be used with
+     * delimited facets
+     *
+     * @return void
+     */
+    public function setDefaultFacetDelimiter($defaultFacetDelimiter)
+    {
+        $this->defaultFacetDelimiter = $defaultFacetDelimiter;
+        $this->processedDelimitedFacets = null; // clear processed value cache
+    }
+
+    /**
+     * Get a list of delimited facets
+     *
+     * @param bool $processed False = return raw values; true = process values into
+     * field => delimiter associative array.
+     *
+     * @return array
+     */
+    public function getDelimitedFacets($processed = false)
+    {
+        if (!$processed) {
+            return $this->delimitedFacets;
+        }
+        if (null === $this->processedDelimitedFacets) {
+            $this->processedDelimitedFacets = [];
+            $defaultDelimiter = $this->getDefaultFacetDelimiter();
+            foreach ($this->delimitedFacets as $current) {
+                $parts = explode('|', $current, 2);
+                if (count($parts) == 2) {
+                    $this->processedDelimitedFacets[$parts[0]] = $parts[1];
+                } else {
+                    $this->processedDelimitedFacets[$parts[0]] = $defaultDelimiter;
+                }
+            }
+        }
+        return $this->processedDelimitedFacets;
+    }
+
+    /**
+     * Set the delimitedFacets value.
+     *
+     * @param array $delimitedFacets An array of delimited facet names
+     *
+     * @return void
+     */
+    public function setDelimitedFacets($delimitedFacets)
+    {
+        $this->delimitedFacets = $delimitedFacets;
+        $this->processedDelimitedFacets = null; // clear processed value cache
+    }
+
+    /**
      * Get a list of facets that are subject to translation.
      *
      * @return array
@@ -519,7 +678,7 @@ abstract class Options implements TranslatorAwareInterface
      */
     public function spellcheckEnabled($bool = null)
     {
-        if (!is_null($bool)) {
+        if (null !== $bool) {
             $this->spellcheck = $bool;
         }
         return $this->spellcheck;
@@ -547,7 +706,7 @@ abstract class Options implements TranslatorAwareInterface
     {
         if (isset($this->basicHandlers[$field])) {
             return $this->translate($this->basicHandlers[$field]);
-        } else if (isset($this->advancedHandlers[$field])) {
+        } elseif (isset($this->advancedHandlers[$field])) {
             return $this->translate($this->advancedHandlers[$field]);
         } else {
             return $field;
@@ -572,6 +731,26 @@ abstract class Options implements TranslatorAwareInterface
     public function autocompleteEnabled()
     {
         return $this->autocompleteEnabled;
+    }
+
+    /**
+     * Should autocomplete auto submit?
+     *
+     * @return bool
+     */
+    public function autocompleteAutoSubmit()
+    {
+        return $this->autocompleteAutoSubmit;
+    }
+
+    /**
+     * Get a string of the listviewOption (full or tab).
+     *
+     * @return string
+     */
+    public function getListViewOption()
+    {
+        return $this->listviewOption;
     }
 
     /**
@@ -607,6 +786,17 @@ abstract class Options implements TranslatorAwareInterface
     }
 
     /**
+     * Return the route name for the facet list action. Returns false to cover
+     * unimplemented support.
+     *
+     * @return string|bool
+     */
+    public function getFacetListAction()
+    {
+        return false;
+    }
+
+    /**
      * Does this search option support the cart/book bag?
      *
      * @return bool
@@ -615,98 +805,6 @@ abstract class Options implements TranslatorAwareInterface
     {
         // Assume true by default.
         return true;
-    }
-
-    /**
-     * Get a session namespace specific to the current class.
-     *
-     * @return SessionContainer
-     */
-    public function getSession()
-    {
-        static $session = false;
-        if (!$session) {
-            $session = new SessionContainer(get_class($this));
-        }
-        return $session;
-    }
-
-    /**
-     * Remember the last sort option used.
-     *
-     * @param string $last Option to remember.
-     *
-     * @return void
-     */
-    public function rememberLastSort($last)
-    {
-        $session = $this->getSession();
-        if (!$session->getManager()->getStorage()->isImmutable()) {
-            $session->lastSort = $last;
-        }
-    }
-
-    /**
-     * Retrieve the last sort option used.
-     *
-     * @return string
-     */
-    public function getLastSort()
-    {
-        $session = $this->getSession();
-        return isset($session->lastSort) ? $session->lastSort : null;
-    }
-
-    /**
-     * Remember the last limit option used.
-     *
-     * @param string $last Option to remember.
-     *
-     * @return void
-     */
-    public function rememberLastLimit($last)
-    {
-        $session = $this->getSession();
-        if (!$session->getManager()->getStorage()->isImmutable()) {
-            $session->lastLimit = $last;
-        }
-    }
-
-    /**
-     * Retrieve the last limit option used.
-     *
-     * @return string
-     */
-    public function getLastLimit()
-    {
-        $session = $this->getSession();
-        return isset($session->lastLimit) ? $session->lastLimit : null;
-    }
-
-    /**
-     * Remember the last view option used.
-     *
-     * @param string $last Option to remember.
-     *
-     * @return void
-     */
-    public function rememberLastView($last)
-    {
-        $session = $this->getSession();
-        if (!$session->getManager()->getStorage()->isImmutable()) {
-            $session->lastView = $last;
-        }
-    }
-
-    /**
-     * Retrieve the last view option used.
-     *
-     * @return string
-     */
-    public function getLastView()
-    {
-        $session = $this->getSession();
-        return isset($session->lastView) ? $session->lastView : null;
     }
 
     /**
@@ -837,18 +935,51 @@ abstract class Options implements TranslatorAwareInterface
     }
 
     /**
-     * Sleep magic method -- the translator can't be serialized, so we need to
-     * exclude it from serialization.  Since we can't obtain a new one in the
-     * __wakeup() method, it needs to be re-injected from outside.
+     * Get the identifier used for naming the various search classes in this family.
      *
-     * @return array
+     * @return string
      */
-    public function __sleep()
+    public function getSearchClassId()
     {
-        $vars = get_object_vars($this);
-        unset($vars['configLoader']);
-        unset($vars['translator']);
-        $vars = array_keys($vars);
-        return $vars;
+        // Parse identifier out of class name of format VuFind\Search\[id]\Options:
+        $class = explode('\\', get_class($this));
+        return $class[2];
+    }
+
+    /**
+     * Should we include first/last options in result scroller navigation?
+     *
+     * @return bool
+     */
+    public function supportsFirstLastNavigation()
+    {
+        return $this->firstlastNavigation;
+    }
+
+    /**
+     * Does this search backend support scheduled searching?
+     *
+     * @return bool
+     */
+    public function supportsScheduledSearch()
+    {
+        // Unsupported by default!
+        return false;
+    }
+
+    /**
+     * Configure autocomplete preferences from an .ini file.
+     *
+     * @param Config $searchSettings Object representation of .ini file
+     *
+     * @return void
+     */
+    protected function configureAutocomplete(Config $searchSettings = null)
+    {
+        // Only change settings from current values if they are defined in .ini:
+        $this->autocompleteEnabled = $searchSettings->Autocomplete->enabled
+            ?? $this->autocompleteEnabled;
+        $this->autocompleteAutoSubmit = $searchSettings->Autocomplete->auto_submit
+            ?? $this->autocompleteAutoSubmit;
     }
 }

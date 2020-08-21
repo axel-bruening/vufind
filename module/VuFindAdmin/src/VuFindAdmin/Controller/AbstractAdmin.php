@@ -2,7 +2,7 @@
 /**
  * VuFind Admin Controller Base
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,34 +17,38 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindAdmin\Controller;
-use Zend\Mvc\MvcEvent;
+
+use Laminas\Mvc\MvcEvent;
+use Laminas\ServiceManager\ServiceLocatorInterface;
 
 /**
  * VuFind Admin Controller Base
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class AbstractAdmin extends \VuFind\Controller\AbstractBase
 {
     /**
      * Constructor
+     *
+     * @param ServiceLocatorInterface $sm Service locator
      */
-    public function __construct()
+    public function __construct(ServiceLocatorInterface $sm)
     {
-        parent::__construct();
+        parent::__construct($sm);
         $this->accessPermission = 'access.AdminModule';
     }
 
@@ -55,7 +59,7 @@ class AbstractAdmin extends \VuFind\Controller\AbstractBase
      *
      * @return void
      */
-    public function preDispatch(MvcEvent $e)
+    public function validateAccessPermission(MvcEvent $e)
     {
         // Disable search box in Admin module:
         $this->layout()->searchbox = false;
@@ -70,20 +74,20 @@ class AbstractAdmin extends \VuFind\Controller\AbstractBase
         // Block access to everyone when module is disabled:
         $config = $this->getConfig();
         if (!isset($config->Site->admin_enabled) || !$config->Site->admin_enabled) {
-            $pluginManager  = $this->getServiceLocator()
-                ->get('Zend\Mvc\Controller\PluginManager');
+            $pluginManager  = $this->serviceLocator
+                ->get(\Laminas\Mvc\Controller\PluginManager::class);
             $redirectPlugin = $pluginManager->get('redirect');
             return $redirectPlugin->toRoute('admin/disabled');
         }
 
         // Call parent method to do permission checking:
-        parent::preDispatch($e);
+        parent::validateAccessPermission($e);
     }
 
     /**
      * Display disabled message.
      *
-     * @return \Zend\View\Model\ViewModel
+     * @return \Laminas\View\Model\ViewModel
      */
     public function disabledAction()
     {

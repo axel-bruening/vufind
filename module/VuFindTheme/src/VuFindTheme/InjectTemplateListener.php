@@ -2,7 +2,7 @@
 /**
  * VuFind "Inject Template" Listener
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Theme
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFindTheme;
 
 /**
- * VuFind "Inject Template" Listener -- this extends the core ZF2 class to adjust
+ * VuFind "Inject Template" Listener -- this extends the core MVC class to adjust
  * default template configurations to something more appropriate for VuFind.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Theme
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class InjectTemplateListener extends \Zend\Mvc\View\Http\InjectTemplateListener
+class InjectTemplateListener extends \Laminas\Mvc\View\Http\InjectTemplateListener
 {
     /**
      * Inflect a name to a normalized value
@@ -54,17 +54,18 @@ class InjectTemplateListener extends \Zend\Mvc\View\Http\InjectTemplateListener
     }
 
     /**
-     * Determine the top-level namespace of the controller
+     * Strip namespace part off controller name for compatibility with theme
+     * system.
      *
-     * @param string $controller Controller name
+     * @param string $controller controller FQCN
      *
-     * @return string
-     *
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @return string|false template name or false if controller was not matched
      */
-    protected function deriveModuleNamespace($controller)
+    public function mapController($controller)
     {
-        // Namespaces just make the theme system more confusing; ignore them:
-        return '';
+        $initial = parent::mapController($controller);
+        $parts = explode('/', $initial);
+        array_shift($parts);
+        return implode('/', $parts);
     }
 }

@@ -2,7 +2,7 @@
 /**
  * VuFind Config Plugin Factory
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ServiceManager
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Config;
-use Zend\Config\Config, Zend\Config\Reader\Ini as IniReader,
-    Zend\ServiceManager\AbstractFactoryInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
+
+use Interop\Container\ContainerInterface;
+use Laminas\Config\Config;
+use Laminas\Config\Reader\Ini as IniReader;
+use Laminas\ServiceManager\Factory\AbstractFactoryInterface;
 
 /**
  * VuFind Config Plugin Factory
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ServiceManager
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class PluginFactory implements AbstractFactoryInterface
 {
@@ -104,7 +106,7 @@ class PluginFactory implements AbstractFactoryInterface
 
         // Now we'll pull all the children down one at a time and override settings
         // as appropriate:
-        while (!is_null($child = array_pop($configs))) {
+        while (null !== ($child = array_pop($configs))) {
             $overrideSections = isset($child->Parent_Config->override_full_sections)
                 ? explode(
                     ',', str_replace(
@@ -113,13 +115,39 @@ class PluginFactory implements AbstractFactoryInterface
                 )
                 : [];
             foreach ($child as $section => $contents) {
+                // Check if arrays in the current config file should be merged with
+                // preceding arrays from config files defined as Parent_Config.
+                $mergeArraySettings
+                    = !empty($child->Parent_Config->merge_array_settings);
+
+                // Omit Parent_Config from the returned configuration; it is only
+                // needed during loading, and its presence will cause problems in
+                // config files that iterate through all of the sections (e.g.
+                // combined.ini, permissions.ini).
+                if ($section === 'Parent_Config') {
+                    continue;
+                }
                 if (in_array($section, $overrideSections)
                     || !isset($config->$section)
                 ) {
                     $config->$section = $child->$section;
                 } else {
                     foreach (array_keys($contents->toArray()) as $key) {
-                        $config->$section->$key = $child->$section->$key;
+                        // If a key is defined as key[] in the config file the key
+                        // remains a Laminas\Config\Config object. If the current
+                        // section is not configured as an override section we try to
+                        // merge the key[] values instead of overwriting them.
+                        if (is_object($config->$section->$key)
+                            && is_object($child->$section->$key)
+                            && $mergeArraySettings
+                        ) {
+                            $config->$section->$key = array_merge(
+                                $config->$section->$key->toArray(),
+                                $child->$section->$key->toArray()
+                            );
+                        } else {
+                            $config->$section->$key = $child->$section->$key;
+                        }
                     }
                 }
             }
@@ -132,17 +160,15 @@ class PluginFactory implements AbstractFactoryInterface
     /**
      * Can we create a service for the specified name?
      *
-     * @param ServiceLocatorInterface $serviceLocator Service locator
-     * @param string                  $name           Name of service
-     * @param string                  $requestedName  Unfiltered name of service
+     * @param ContainerInterface $container     Service container
+     * @param string             $requestedName Name of service
      *
      * @return bool
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function canCreateServiceWithName(ServiceLocatorInterface $serviceLocator,
-        $name, $requestedName
-    ) {
+    public function canCreate(ContainerInterface $container, $requestedName)
+    {
         // Assume that configurations exist:
         return true;
     }
@@ -150,16 +176,16 @@ class PluginFactory implements AbstractFactoryInterface
     /**
      * Create a service for the specified name.
      *
-     * @param ServiceLocatorInterface $serviceLocator Service locator
-     * @param string                  $name           Name of service
-     * @param string                  $requestedName  Unfiltered name of service
+     * @param ContainerInterface $container     Service container
+     * @param string             $requestedName Name of service
+     * @param array              $options       Options (unused)
      *
      * @return object
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function createServiceWithName(ServiceLocatorInterface $serviceLocator,
-        $name, $requestedName
+    public function __invoke(ContainerInterface $container, $requestedName,
+        array $options = null
     ) {
         return $this->loadConfigFile($requestedName . '.ini');
     }

@@ -2,7 +2,7 @@
 /**
  * VuFind Action Helper - Storage Retrieval Requests Support Methods
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  * Copyright (C) The National Library of Finland 2014.
@@ -18,26 +18,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller_Plugins
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Controller\Plugin;
 
 /**
- * Zend action helper to perform storage retrieval request related actions
+ * Action helper to perform storage retrieval request related actions
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller_Plugins
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class StorageRetrievalRequests extends AbstractRequestBase
 {
@@ -101,7 +101,7 @@ class StorageRetrievalRequests extends AbstractRequestBase
         $selected = $params->fromPost('cancelSelected');
         if (!empty($all)) {
             $details = $params->fromPost('cancelAllIDS');
-        } else if (!empty($selected)) {
+        } elseif (!empty($selected)) {
             $details = $params->fromPost('cancelSelectedIDS');
         } else {
             // No button pushed -- no action needed
@@ -141,7 +141,7 @@ class StorageRetrievalRequests extends AbstractRequestBase
 
             foreach ($details as $info) {
                 // If the user input contains a value not found in the session
-                // whitelist, something has been tampered with -- abort the process.
+                // legal list, something has been tampered with -- abort the process.
                 if (!in_array($info, $this->getSession()->validIds)) {
                     $flashMsg->addMessage('error_inconsistent_parameters', 'error');
                     return [];
@@ -157,14 +157,12 @@ class StorageRetrievalRequests extends AbstractRequestBase
                     ->addMessage('storage_retrieval_request_cancel_fail', 'error');
             } else {
                 if ($cancelResults['count'] > 0) {
-                    // TODO : add a mechanism for inserting tokens into translated
-                    // messages so we can avoid a double translation here.
-                    $msg = $this->getController()->translate(
-                        'storage_retrieval_request_cancel_success_items'
-                    );
-                    $flashMsg->addMessage(
-                        $cancelResults['count'] . ' ' . $msg, 'success'
-                    );
+                    $msg = $this->getController()
+                        ->translate(
+                            'storage_retrieval_request_cancel_success_items',
+                            ['%%count%%' => $cancelResults['count']]
+                        );
+                    $flashMsg->addMessage($msg, 'success');
                 }
                 return $cancelResults;
             }

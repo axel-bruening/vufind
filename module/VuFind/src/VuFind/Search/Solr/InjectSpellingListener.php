@@ -3,7 +3,7 @@
 /**
  * Solr spelling listener.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,33 +18,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Solr;
 
-use VuFindSearch\Service;
+use Laminas\EventManager\EventInterface;
+use Laminas\EventManager\SharedEventManagerInterface;
 use VuFindSearch\Backend\BackendInterface;
 use VuFindSearch\Backend\Solr\Response\Json\Spellcheck;
 use VuFindSearch\ParamBag;
-use VuFindSearch\Query\Query;
 
-use Zend\EventManager\SharedEventManagerInterface;
-use Zend\EventManager\EventInterface;
+use VuFindSearch\Query\Query;
+use VuFindSearch\Service;
 
 /**
  * Solr spelling listener.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class InjectSpellingListener
 {
@@ -134,8 +134,9 @@ class InjectSpellingListener
                     );
 
                     // Turn on spellcheck.q generation in query builder:
-                    $this->backend->getQueryBuilder()
-                        ->setCreateSpellingQuery(true);
+                    $this->backend->getQueryBuilder()->setCreateSpellingQuery(true);
+                } else {
+                    $this->backend->getQueryBuilder()->setCreateSpellingQuery(false);
                 }
             }
         }

@@ -2,7 +2,7 @@
 /**
  * SideFacets Recommendations Module
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 namespace VuFind\Recommend;
-use VuFind\Solr\Utils as SolrUtils;
+
 use VuFind\Search\Solr\HierarchicalFacetHelper;
+use VuFind\Solr\Utils as SolrUtils;
 
 /**
  * SideFacets Recommendations Module
  *
  * This class provides recommendations displaying facets beside search results
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 class SideFacets extends AbstractFacets
 {
@@ -83,6 +84,13 @@ class SideFacets extends AbstractFacets
      * @var array
      */
     protected $checkboxFacets = [];
+
+    /**
+     * Settings controlling how lightbox is used for facet display.
+     *
+     * @var bool|string
+     */
+    protected $showInLightboxSettings = [];
 
     /**
      * Settings controlling how many values to display before "show more."
@@ -146,8 +154,8 @@ class SideFacets extends AbstractFacets
         // Parse the additional settings:
         $settings = explode(':', $settings);
         $mainSection = empty($settings[0]) ? 'Results' : $settings[0];
-        $checkboxSection = isset($settings[1]) ? $settings[1] : false;
-        $iniName = isset($settings[2]) ? $settings[2] : 'facets';
+        $checkboxSection = $settings[1] ?? false;
+        $iniName = $settings[2] ?? 'facets';
 
         // Load the desired facet information...
         $config = $this->configLoader->get($iniName);
@@ -193,6 +201,10 @@ class SideFacets extends AbstractFacets
             $this->showMoreSettings
                 = $config->Results_Settings->showMore->toArray();
         }
+        if (isset($config->Results_Settings->showMoreInLightbox)) {
+            $this->showInLightboxSettings
+                = $config->Results_Settings->showMoreInLightbox->toArray();
+        }
 
         // Collapsed facets:
         if (isset($config->Results_Settings->collapsedFacets)) {
@@ -219,7 +231,7 @@ class SideFacets extends AbstractFacets
      * be needed.
      *
      * @param \VuFind\Search\Base\Params $params  Search parameter object
-     * @param \Zend\StdLib\Parameters    $request Parameter object representing user
+     * @param \Laminas\Stdlib\Parameters $request Parameter object representing user
      * request.
      *
      * @return void
@@ -233,6 +245,17 @@ class SideFacets extends AbstractFacets
         foreach ($this->checkboxFacets as $name => $desc) {
             $params->addCheckboxFacet($name, $desc);
         }
+    }
+
+    /**
+     * Get checkbox facet information from the search results.
+     *
+     * @return array
+     */
+    public function getCheckboxFacetSet()
+    {
+        return $this->results->getParams()
+            ->getCheckboxFacets(array_keys($this->checkboxFacets));
     }
 
     /**
@@ -256,9 +279,9 @@ class SideFacets extends AbstractFacets
                 $facetArray = $this->hierarchicalFacetHelper->buildFacetArray(
                     $hierarchicalFacet, $facetSet[$hierarchicalFacet]['list']
                 );
-                $facetSet[$hierarchicalFacet]['list']
-                    = $this->hierarchicalFacetHelper
-                        ->flattenFacetHierarchy($facetArray);
+                $facetSet[$hierarchicalFacet]['list'] = $this
+                    ->hierarchicalFacetHelper
+                    ->flattenFacetHierarchy($facetArray);
             }
         }
 
@@ -341,19 +364,20 @@ class SideFacets extends AbstractFacets
         if (empty($this->collapsedFacets)) {
             return [];
         } elseif ($this->collapsedFacets == '*') {
-            return array_keys($this->getFacetSet());
+            return array_keys($this->mainFacets);
         }
         return array_map('trim', explode(',', $this->collapsedFacets));
     }
 
     /**
      * Return the list of facets configured to be collapsed
+     * defaults to 6
      *
      * @param string $facetName Name of the facet to get
      *
      * @return int
      */
-    public function getShowMoreSetting($facetName = '*')
+    public function getShowMoreSetting($facetName)
     {
         // Look for either facet-specific configuration or else a configured
         // default. If neither is found, initialize return value to 0.
@@ -368,36 +392,24 @@ class SideFacets extends AbstractFacets
     }
 
     /**
-     * Get the list of filters to display
+     * Return settings for showing more results in the lightbox
      *
-     * @param array $extraFilters Extra filters to add to the list.
+     * @param string $facetName Name of the facet to get
      *
-     * @return array
+     * @return int
      */
-    public function getVisibleFilters($extraFilters = [])
+    public function getShowInLightboxSetting($facetName)
     {
-        // Merge extras into main list:
-        $filterList = array_merge(
-            $this->results->getParams()->getFilterList(true), $extraFilters
-        );
-
-        // Filter out suppressed values:
-        $final = [];
-        foreach ($filterList as $field => $filters) {
-            $current = [];
-            foreach ($filters as $filter) {
-                if (!isset($filter['suppressDisplay'])
-                    || !$filter['suppressDisplay']
-                ) {
-                    $current[] = $filter;
-                }
-            }
-            if (!empty($current)) {
-                $final[$field] = $current;
-            }
+        // Look for either facet-specific configuration or else a configured
+        // default.
+        if (isset($this->showInLightboxSettings[$facetName])) {
+            return $this->showInLightboxSettings[$facetName];
+        } elseif (isset($this->showInLightboxSettings['*'])) {
+            return $this->showInLightboxSettings['*'];
         }
 
-        return $final;
+        // No config found; use default behavior:
+        return 'more';
     }
 
     /**
@@ -409,7 +421,7 @@ class SideFacets extends AbstractFacets
      */
     protected function getRangeFacets($property)
     {
-        $filters = $this->results->getParams()->getFilters();
+        $filters = $this->results->getParams()->getRawFilters();
         $result = [];
         if (isset($this->$property) && is_array($this->$property)) {
             foreach ($this->$property as $current) {

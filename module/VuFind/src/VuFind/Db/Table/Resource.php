@@ -2,7 +2,7 @@
 /**
  * Table Definition for resource
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,44 +17,65 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Db\Table;
-use Zend\Db\Sql\Expression;
+
+use Laminas\Db\Adapter\Adapter;
+use Laminas\Db\Sql\Expression;
+use VuFind\Date\Converter as DateConverter;
+use VuFind\Db\Row\RowGateway;
+use VuFind\Record\Loader;
 
 /**
  * Table Definition for resource
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class Resource extends Gateway
 {
     /**
      * Date converter
      *
-     * @var \VuFind\Date\Converter
+     * @var DateConverter
      */
     protected $dateConverter;
 
     /**
+     * Record loader
+     *
+     * @var Loader
+     */
+    protected $recordLoader;
+
+    /**
      * Constructor
      *
-     * @param \VuFind\Date\Converter $converter Date converter
+     * @param Adapter       $adapter   Database adapter
+     * @param PluginManager $tm        Table manager
+     * @param array         $cfg       Laminas configuration
+     * @param RowGateway    $rowObj    Row prototype object (null for default)
+     * @param DateConverter $converter Date converter
+     * @param Loader        $loader    Record loader
+     * @param string        $table     Name of database table to interface with
      */
-    public function __construct(\VuFind\Date\Converter $converter)
-    {
+    public function __construct(Adapter $adapter, PluginManager $tm, $cfg,
+        ?RowGateway $rowObj, DateConverter $converter, Loader $loader,
+        $table = 'resource'
+    ) {
         $this->dateConverter = $converter;
-        parent::__construct('resource', 'VuFind\Db\Row\Resource');
+        $this->recordLoader = $loader;
+        parent::__construct($adapter, $tm, $cfg, $rowObj, $table);
     }
 
     /**
@@ -63,8 +84,7 @@ class Resource extends Gateway
      * @param string                            $id     Record ID to look up
      * @param string                            $source Source of record to look up
      * @param bool                              $create If true, create the row if it
-     * does not
-     * yet exist.
+     * does not yet exist.
      * @param \VuFind\RecordDriver\AbstractBase $driver A record driver for the
      * resource being created (optional -- improves efficiency if provided, but will
      * be auto-loaded as needed if left null).
@@ -72,8 +92,8 @@ class Resource extends Gateway
      * @return \VuFind\Db\Row\Resource|null Matching row if found or created, null
      * otherwise.
      */
-    public function findResource($id, $source = 'VuFind', $create = true,
-        $driver = null
+    public function findResource($id, $source = DEFAULT_SEARCH_BACKEND,
+        $create = true, $driver = null
     ) {
         if (empty($id)) {
             throw new \Exception('Resource ID cannot be empty');
@@ -88,9 +108,8 @@ class Resource extends Gateway
             $result->source = $source;
 
             // Load record if it was not provided:
-            if (is_null($driver)) {
-                $driver = $this->getServiceLocator()->getServiceLocator()
-                    ->get('VuFind\RecordLoader')->load($id, $source);
+            if (null === $driver) {
+                $driver = $this->recordLoader->load($id, $source);
             }
 
             // Load metadata into the database for sorting/failback purposes:
@@ -108,9 +127,9 @@ class Resource extends Gateway
      * @param array  $ids    Array of IDs
      * @param string $source Source of records to look up
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
-    public function findResources($ids, $source = 'VuFind')
+    public function findResources($ids, $source = DEFAULT_SEARCH_BACKEND)
     {
         $callback = function ($select) use ($ids, $source) {
             $select->where->in('record_id', $ids);
@@ -130,7 +149,7 @@ class Resource extends Gateway
      * @param int    $offset Offset for results
      * @param int    $limit  Limit for results (null for none)
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
     public function getFavorites($user, $list = null, $tags = [],
         $sort = null, $offset = 0, $limit = null
@@ -154,14 +173,14 @@ class Resource extends Gateway
                 $s->where->equalTo('ur.user_id', $user);
 
                 // Adjust for list if necessary:
-                if (!is_null($list)) {
+                if (null !== $list) {
                     $s->where->equalTo('ur.list_id', $list);
                 }
 
                 if ($offset > 0) {
                     $s->offset($offset);
                 }
-                if (!is_null($limit)) {
+                if (null !== $limit) {
                     $s->limit($limit);
                 }
 
@@ -190,7 +209,7 @@ class Resource extends Gateway
      * Get a set of records that do not have metadata stored in the resource
      * table.
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
     public function findMissingMetadata()
     {
@@ -203,12 +222,60 @@ class Resource extends Gateway
     }
 
     /**
+     * Update the database to reflect a changed record identifier.
+     *
+     * @param string $oldId  Original record ID
+     * @param string $newId  Revised record ID
+     * @param string $source Record source
+     *
+     * @return void
+     */
+    public function updateRecordId($oldId, $newId, $source = DEFAULT_SEARCH_BACKEND)
+    {
+        if ($oldId !== $newId
+            && $resource = $this->findResource($oldId, $source)
+        ) {
+            // Do this as a transaction to prevent odd behavior:
+            $connection = $this->getAdapter()->getDriver()->getConnection();
+            $connection->beginTransaction();
+            // Does the new ID already exist?
+            if ($newResource = $this->findResource($newId, $source)) {
+                // Special case: merge new ID and old ID:
+                $tableObjects = [];
+                foreach (['comments', 'userresource', 'resourcetags'] as $table) {
+                    $tableObjects[$table] = $this->getDbTable($table);
+                    $tableObjects[$table]->update(
+                        ['resource_id' => $newResource->id],
+                        ['resource_id' => $resource->id]
+                    );
+                }
+                $resource->delete();
+            } else {
+                // Default case: just update the record ID:
+                $resource->record_id = $newId();
+                $resource->save();
+            }
+            // Done -- commit the transaction:
+            $connection->commit();
+
+            // Deduplicate rows where necessary (this can be safely done outside
+            // of the transaction):
+            if (isset($tableObjects['resourcetags'])) {
+                $tableObjects['resourcetags']->deduplicate();
+            }
+            if (isset($tableObjects['userresource'])) {
+                $tableObjects['userresource']->deduplicate();
+            }
+        }
+    }
+
+    /**
      * Apply a sort parameter to a query on the resource table.
      *
-     * @param \Zend\Db\Sql\Select $query Query to modify
-     * @param string              $sort  Field to use for sorting (may include 'desc'
-     * qualifier)
-     * @param string              $alias Alias to the resource table (defaults to
+     * @param \Laminas\Db\Sql\Select $query Query to modify
+     * @param string                 $sort  Field to use for sorting (may include
+     * 'desc' qualifier)
+     * @param string                 $alias Alias to the resource table (defaults to
      * 'resource')
      *
      * @return void

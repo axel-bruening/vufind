@@ -3,7 +3,7 @@
 /**
  * Abstract record collection (implements some shared low-level functionality).
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,24 +18,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Response;
 
 /**
  * Abstract record collection (implements some shared low-level functionality).
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 abstract class AbstractRecordCollection implements RecordCollectionInterface
 {
@@ -78,6 +78,16 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     }
 
     /**
+     * Return any errors.
+     *
+     * @return array
+     */
+    public function getErrors()
+    {
+        return [];
+    }
+
+    /**
      * Shuffles records.
      *
      * @return bool
@@ -94,7 +104,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      */
     public function first()
     {
-        return isset($this->records[0]) ? $this->records[0] : null;
+        return $this->records[0] ?? null;
     }
 
     /**
@@ -117,6 +127,9 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     public function setSourceIdentifier($identifier)
     {
         $this->source = $identifier;
+        foreach ($this->records as $record) {
+            $record->setSourceIdentifier($identifier);
+        }
     }
 
     /**
@@ -132,16 +145,30 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     /**
      * Add a record to the collection.
      *
-     * @param RecordInterface $record Record to add
+     * @param RecordInterface $record        Record to add
+     * @param bool            $checkExisting Whether to check for existing record in
+     * the collection (slower, but makes sure there are no duplicates)
      *
      * @return void
      */
-    public function add(RecordInterface $record)
+    public function add(RecordInterface $record, $checkExisting = true)
     {
-        if (!in_array($record, $this->records, true)) {
+        if (!$checkExisting || !$this->has($record)) {
             $this->records[$this->pointer] = $record;
             $this->next();
         }
+    }
+
+    /**
+     * Check if the collection contains the given record
+     *
+     * @param RecordInterface $record Record to check
+     *
+     * @return bool
+     */
+    public function has(RecordInterface $record)
+    {
+        return in_array($record, $this->records, true);
     }
 
     /**
@@ -165,7 +192,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     /**
      * Return true if current collection index is valid.
      *
-     * @return boolean
+     * @return bool
      */
     public function valid()
     {
@@ -223,5 +250,4 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     {
         return count($this->records);
     }
-
 }

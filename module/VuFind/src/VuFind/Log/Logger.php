@@ -2,7 +2,7 @@
 /**
  * VuFind Logger
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,32 +17,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Error_Logging
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Log;
-use Zend\Log\Logger as BaseLogger,
-    Zend\ServiceManager\ServiceLocatorAwareInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
+
+use Laminas\Log\Logger as BaseLogger;
+use Traversable;
+use VuFind\Net\UserIpReader;
 
 /**
  * This class wraps the BaseLogger class to allow for log verbosity
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Error_Logging
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class Logger extends BaseLogger implements ServiceLocatorAwareInterface
+class Logger extends BaseLogger
 {
-    use \Zend\ServiceManager\ServiceLocatorAwareTrait;
-
     /**
      * Is debug logging enabled?
      *
@@ -51,179 +50,29 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
     protected $debugNeeded = false;
 
     /**
-     * Set configuration
+     * User IP address reader
      *
-     * @param \Zend\Config\Config $config VuFind configuration
-     *
-     * @return void
+     * @var UserIpReader
      */
-    public function setConfig($config)
-    {
-        // DEBUGGER
-        if (!$config->System->debug == false) {
-            $this->addDebugWriter($config->System->debug);
-        }
-
-        // Activate database logging, if applicable:
-        if (isset($config->Logging->database)) {
-            $parts = explode(':', $config->Logging->database);
-            $table_name = $parts[0];
-            $error_types = isset($parts[1]) ? $parts[1] : '';
-
-            $columnMapping = [
-                'priority' => 'priority',
-                'message' => 'message',
-                'logtime' => 'timestamp',
-                'ident' => 'ident'
-            ];
-
-            // Make Writers
-            $filters = explode(',', $error_types);
-            $writer = new Writer\Db(
-                $this->getServiceLocator()->get('VuFind\DbAdapter'),
-                $table_name, $columnMapping
-            );
-            $this->addWriters($writer, $filters);
-        }
-
-        // Activate file logging, if applicable:
-        if (isset($config->Logging->file)) {
-            $parts = explode(':', $config->Logging->file);
-            $file = $parts[0];
-            $error_types = isset($parts[1]) ? $parts[1] : '';
-
-            // Make Writers
-            $filters = explode(',', $error_types);
-            $writer = new Writer\Stream($file);
-            $this->addWriters($writer, $filters);
-        }
-
-        // Activate email logging, if applicable:
-        if (isset($config->Logging->email)) {
-            // Set up the logger's mailer to behave consistently with VuFind's
-            // general mailer:
-            $parts = explode(':', $config->Logging->email);
-            $email = $parts[0];
-            $error_types = isset($parts[1]) ? $parts[1] : '';
-
-            // use smtp
-            $mailer = $this->getServiceLocator()->get('VuFind\Mailer');
-            $msg = $mailer->getNewMessage()
-                ->addFrom($config->Site->email)
-                ->addTo($email)
-                ->setSubject('VuFind Log Message');
-
-            // Make Writers
-            $filters = explode(',', $error_types);
-            $writer = new Writer\Mail($msg, $mailer->getTransport());
-            $this->addWriters($writer, $filters);
-        }
-
-        // Null (no-op) writer to avoid errors
-        if (count($this->writers) == 0) {
-            $nullWriter = 'Zend\Log\Writer\Noop';
-            $this->addWriter(new $nullWriter());
-        }
-    }
+    protected $userIpReader;
 
     /**
-     * Add the standard debug stream writer.
+     * Constructor
      *
-     * @param bool|int $debug Debug mode/level
+     * Set options for a logger. Accepted options are:
+     * - writers: array of writers to add to this logger
+     * - exceptionhandler: if true register this logger as exceptionhandler
+     * - errorhandler: if true register this logger as errorhandler
+     * - vufind_ip_reader: UserIpReader object to use for IP lookups
      *
-     * @return void
+     * @param array|Traversable $options Configuration options
+     *
+     * @throws \Laminas\Log\Exception\InvalidArgumentException
      */
-    public function addDebugWriter($debug)
+    public function __construct($options = null)
     {
-        // Only add debug writer ONCE!
-        static $hasDebugWriter = false;
-        if ($hasDebugWriter) {
-            return;
-        }
-
-        $hasDebugWriter = true;
-        $writer = new Writer\Stream('php://output');
-        $formatter = new \Zend\Log\Formatter\Simple(
-            '<pre>%timestamp% %priorityName%: %message%</pre>' . PHP_EOL
-        );
-        $writer->setFormatter($formatter);
-        $this->addWriters($writer, 'debug-' . (is_int($debug) ? $debug : '5'));
-    }
-
-    /**
-     * Applies an array of filters to a writer
-     *
-     * Filter keys: alert, error, notice, debug
-     *
-     * @param Zend\Log\Writer\WriterInterface $writer  The writer to apply the
-     * filters to
-     * @param string|array                    $filters An array or comma-separated
-     * string of
-     * logging levels
-     *
-     * @return void
-     */
-    protected function addWriters($writer, $filters)
-    {
-        if (!is_array($filters)) {
-            $filters = explode(',', $filters);
-        }
-
-        foreach ($filters as $filter) {
-            $parts = explode('-', $filter);
-            $priority = $parts[0];
-            $verbosity = isset($parts[1]) ? $parts[1] : false;
-
-            // VuFind's configuration provides four priority options, each
-            // combining two of the standard Zend levels.
-            switch(trim($priority)) {
-            case 'debug':
-                // Set static flag indicating that debug is turned on:
-                $this->debugNeeded = true;
-
-                $max = BaseLogger::INFO;  // Informational: informational messages
-                $min = BaseLogger::DEBUG; // Debug: debug messages
-                break;
-            case 'notice':
-                $max = BaseLogger::WARN;  // Warning: warning conditions
-                $min = BaseLogger::NOTICE;// Notice: normal but significant condition
-                break;
-            case 'error':
-                $max = BaseLogger::CRIT;  // Critical: critical conditions
-                $min = BaseLogger::ERR;   // Error: error conditions
-                break;
-            case 'alert':
-                $max = BaseLogger::EMERG; // Emergency: system is unusable
-                $min = BaseLogger::ALERT; // Alert: action must be taken immediately
-                break;
-            default:                    // INVALID FILTER
-                continue;
-            }
-
-            // Clone the submitted writer since we'll need a separate instance of the
-            // writer for each selected priority level.
-            $newWriter = clone($writer);
-
-            // verbosity
-            if ($verbosity) {
-                if (method_exists($newWriter, 'setVerbosity')) {
-                    $newWriter->setVerbosity($verbosity);
-                } else {
-                    throw new \Exception(
-                        get_class($newWriter) . ' does not support verbosity.'
-                    );
-                }
-            }
-
-            // filtering -- only log messages between the min and max priority levels
-            $filter1 = new \Zend\Log\Filter\Priority($min, '<=');
-            $filter2 = new \Zend\Log\Filter\Priority($max, '>=');
-            $newWriter->addFilter($filter1);
-            $newWriter->addFilter($filter2);
-
-            // add the writer
-            $this->addWriter($newWriter);
-        }
+        parent::__construct($options);
+        $this->userIpReader = $options['vufind_ip_reader'] ?? null;
     }
 
     /**
@@ -231,10 +80,15 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
      * know, since some code can save time that would be otherwise wasted generating
      * debug messages if we know that no one is listening).
      *
+     * @param bool $newState New state (omit to leave current state unchanged)
+     *
      * @return bool
      */
-    public function debugNeeded()
+    public function debugNeeded($newState = null)
     {
+        if (null !== $newState) {
+            $this->debugNeeded = $newState;
+        }
         return $this->debugNeeded;
     }
 
@@ -257,7 +111,7 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
                 $writer->write(
                     [
                         'timestamp'    => $timestamp,
-                        'priority'     => (int) $priority,
+                        'priority'     => (int)$priority,
                         'priorityName' => $this->priorities[$priority],
                         'message'      => $message,
                         'extra'        => $extra
@@ -270,10 +124,28 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
     }
 
     /**
-     * Log an exception triggered by ZF2 for administrative purposes.
+     * Given an exception, return a severity level for logging purposes.
      *
-     * @param \Exception              $error  Exception to log
-     * @param \Zend\Stdlib\Parameters $server Server metadata
+     * @param \Exception $error Exception to analyze
+     *
+     * @return int
+     */
+    protected function getSeverityFromException($error)
+    {
+        // Treat unexpected or 5xx errors as more severe than 4xx errors.
+        if ($error instanceof \VuFind\Exception\HttpStatusInterface
+            && in_array($error->getHttpStatus(), [403, 404])
+        ) {
+            return BaseLogger::WARN;
+        }
+        return BaseLogger::CRIT;
+    }
+
+    /**
+     * Log an exception triggered by the framework for administrative purposes.
+     *
+     * @param \Exception                 $error  Exception to log
+     * @param \Laminas\Stdlib\Parameters $server Server metadata
      *
      * @return void
      */
@@ -281,13 +153,22 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
     {
         // We need to build a variety of pieces so we can supply
         // information at five different verbosity levels:
-        $baseError = $error->getMessage();
+        $baseError = get_class($error) . ' : ' . $error->getMessage();
+        $prev = $error->getPrevious();
+        while ($prev) {
+            $baseError .= ' ; ' . get_class($prev) . ' : ' . $prev->getMessage();
+            $prev = $prev->getPrevious();
+        }
         $referer = $server->get('HTTP_REFERER', 'none');
+        $ipAddr = $this->userIpReader !== null
+            ? $this->userIpReader->getUserIp() : $server->get('REMOTE_ADDR');
         $basicServer
-            = '(Server: IP = ' . $server->get('REMOTE_ADDR') . ', '
+            = '(Server: IP = ' . $ipAddr . ', '
             . 'Referer = ' . $referer . ', '
             . 'User Agent = '
             . $server->get('HTTP_USER_AGENT') . ', '
+            . 'Host = '
+            . $server->get('HTTP_HOST') . ', '
             . 'Request URI = '
             . $server->get('REQUEST_URI') . ')';
         $detailedServer = "\nServer Context:\n"
@@ -327,9 +208,9 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
             5 => $baseError . $detailedServer . $detailedBacktrace
         ];
 
-        $this->log(BaseLogger::CRIT, $errorDetails);
+        $this->log($this->getSeverityFromException($error), $errorDetails);
     }
-    
+
     /**
      * Convert function argument to a loggable string
      *
@@ -339,7 +220,6 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
      */
     protected function argumentToString($arg)
     {
-        
         if (is_object($arg)) {
             return get_class($arg) . ' Object';
         }
@@ -356,7 +236,7 @@ class Logger extends BaseLogger implements ServiceLocatorAwareInterface
         if (is_int($arg) || is_float($arg)) {
             return (string)$arg;
         }
-        if (is_null($arg)) {
+        if (null === $arg) {
             return 'null';
         }
         return "'$arg'";

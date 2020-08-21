@@ -3,7 +3,7 @@
 /**
  * Factory for WorldCat backends.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,70 +18,85 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Factory;
 
-use VuFindSearch\Backend\BackendInterface;
-use VuFindSearch\Backend\WorldCat\Response\XML\RecordCollectionFactory;
-use VuFindSearch\Backend\WorldCat\QueryBuilder;
-use VuFindSearch\Backend\WorldCat\Connector;
-use VuFindSearch\Backend\WorldCat\Backend;
+use Interop\Container\ContainerInterface;
 
-use Zend\ServiceManager\ServiceLocatorInterface;
-use Zend\ServiceManager\FactoryInterface;
+use Laminas\ServiceManager\Factory\FactoryInterface;
+use VuFindSearch\Backend\WorldCat\Backend;
+use VuFindSearch\Backend\WorldCat\Connector;
+use VuFindSearch\Backend\WorldCat\QueryBuilder;
+
+use VuFindSearch\Backend\WorldCat\Response\XML\RecordCollectionFactory;
 
 /**
  * Factory for WorldCat backends.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class WorldCatBackendFactory implements FactoryInterface
 {
     /**
      * Logger.
      *
-     * @var Zend\Log\LoggerInterface
+     * @var \Laminas\Log\LoggerInterface
      */
     protected $logger;
 
     /**
      * Superior service manager.
      *
-     * @var ServiceLocatorInterface
+     * @var ContainerInterface
      */
     protected $serviceLocator;
 
     /**
      * VuFind configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config;
 
     /**
-     * Create the backend.
+     * WorldCat configuration
      *
-     * @param ServiceLocatorInterface $serviceLocator Superior service manager
-     *
-     * @return BackendInterface
+     * @var \Laminas\Config\Config
      */
-    public function createService(ServiceLocatorInterface $serviceLocator)
+    protected $wcConfig;
+
+    /**
+     * Create service
+     *
+     * @param ContainerInterface $sm      Service manager
+     * @param string             $name    Requested service name (unused)
+     * @param array              $options Extra options (unused)
+     *
+     * @return Backend
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function __invoke(ContainerInterface $sm, $name, array $options = null)
     {
-        $this->serviceLocator = $serviceLocator;
-        $this->config = $this->serviceLocator->get('VuFind\Config')->get('config');
-        if ($this->serviceLocator->has('VuFind\Logger')) {
-            $this->logger = $this->serviceLocator->get('VuFind\Logger');
+        $this->serviceLocator = $sm;
+        $this->config = $this->serviceLocator
+            ->get(\VuFind\Config\PluginManager::class)
+            ->get('config');
+        $this->wcConfig = $this->serviceLocator
+            ->get(\VuFind\Config\PluginManager::class)->get('WorldCat');
+        if ($this->serviceLocator->has(\VuFind\Log\Logger::class)) {
+            $this->logger = $this->serviceLocator->get(\VuFind\Log\Logger::class);
         }
         $connector = $this->createConnector();
         $backend   = $this->createBackend($connector);
@@ -112,9 +127,11 @@ class WorldCatBackendFactory implements FactoryInterface
     {
         $wsKey = isset($this->config->WorldCat->apiKey)
             ? $this->config->WorldCat->apiKey : null;
-        $connector = new Connector(
-            $wsKey, $this->serviceLocator->get('VuFind\Http')->createClient()
-        );
+        $connectorOptions = isset($this->wcConfig->Connector)
+            ? $this->wcConfig->Connector->toArray() : [];
+        $client = $this->serviceLocator->get(\VuFindHttp\HttpService::class)
+            ->createClient();
+        $connector = new Connector($wsKey, $client, $connectorOptions);
         $connector->setLogger($this->logger);
         return $connector;
     }
@@ -138,7 +155,8 @@ class WorldCatBackendFactory implements FactoryInterface
      */
     protected function createRecordCollectionFactory()
     {
-        $manager = $this->serviceLocator->get('VuFind\RecordDriverPluginManager');
+        $manager = $this->serviceLocator
+            ->get(\VuFind\RecordDriver\PluginManager::class);
         $callback = function ($data) use ($manager) {
             $driver = $manager->get('WorldCat');
             $driver->setRawData($data);

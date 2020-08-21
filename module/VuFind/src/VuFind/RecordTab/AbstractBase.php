@@ -2,7 +2,7 @@
 /**
  * Record tab abstract base class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 namespace VuFind\RecordTab;
-use ZfcRbac\Service\AuthorizationServiceAwareInterface,
-    ZfcRbac\Service\AuthorizationServiceAwareTrait;
+
+use LmcRbacMvc\Service\AuthorizationServiceAwareInterface;
+use LmcRbacMvc\Service\AuthorizationServiceAwareTrait;
 
 /**
  * Record tab abstract base class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 abstract class AbstractBase implements TabInterface,
     AuthorizationServiceAwareInterface
@@ -61,7 +62,7 @@ abstract class AbstractBase implements TabInterface,
     /**
      * User request associated with the tab (false for none)
      *
-     * @var \Zend\Http\Request|bool
+     * @var \Laminas\Http\Request|bool
      */
     protected $request = false;
 
@@ -136,11 +137,11 @@ abstract class AbstractBase implements TabInterface,
     /**
      * Set the user request
      *
-     * @param \Zend\Http\Request $request Request
+     * @param \Laminas\Http\Request $request Request
      *
      * @return AbstractBase
      */
-    public function setRequest(\Zend\Http\Request $request)
+    public function setRequest(\Laminas\Http\Request $request)
     {
         $this->request = $request;
         return $this;
@@ -149,7 +150,7 @@ abstract class AbstractBase implements TabInterface,
     /**
      * Get the user request (or false if unavailable)
      *
-     * @return \Zend\Http\Request|bool
+     * @return \Laminas\Http\Request|bool
      */
     protected function getRequest()
     {

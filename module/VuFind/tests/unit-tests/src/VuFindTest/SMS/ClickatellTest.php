@@ -2,7 +2,7 @@
 /**
  * SMS test
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\SMS;
+
 use VuFind\SMS\Clickatell;
 
 /**
  * SMS test
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class ClickatellTest extends \VuFindTest\Unit\TestCase
 {
@@ -44,7 +45,7 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
         // Without SOAP functionality, we can't proceed:
         if (!function_exists('iconv')) {
@@ -75,7 +76,7 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
     {
         $client = $this->getMockClient();
         $expectedUri = 'https://api.clickatell.com/http/sendmsg?api_id=api_id&user=user&password=password&to=1234567890&text=hello';
-        $response = new \Zend\Http\Response();
+        $response = new \Laminas\Http\Response();
         $response->setStatusCode(200);
         $response->setContent('ID:fake');
         $client->expects($this->once())->method('setMethod')->with($this->equalTo('GET'))->will($this->returnValue($client));
@@ -91,15 +92,15 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
      * Test unexpected response
      *
      * @return void
-     *
-     * @expectedException        VuFind\Exception\Mail
-     * @expectedExceptionMessage badbadbad
      */
     public function testUnexpectedResponse()
     {
+        $this->expectException(\VuFind\Exception\Mail::class);
+        $this->expectExceptionMessage('badbadbad');
+
         $client = $this->getMockClient();
         $expectedUri = 'https://api.clickatell.com/http/sendmsg?api_id=api_id&user=user&password=password&to=1234567890&text=hello';
-        $response = new \Zend\Http\Response();
+        $response = new \Laminas\Http\Response();
         $response->setStatusCode(200);
         $response->setContent('badbadbad');
         $client->expects($this->once())->method('setMethod')->with($this->equalTo('GET'))->will($this->returnValue($client));
@@ -113,15 +114,15 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
      * Test unsuccessful query
      *
      * @return void
-     *
-     * @expectedException        VuFind\Exception\Mail
-     * @expectedExceptionMessage Problem sending text.
      */
     public function testFailureResponse()
     {
+        $this->expectException(\VuFind\Exception\Mail::class);
+        $this->expectExceptionMessage('Problem sending text.');
+
         $client = $this->getMockClient();
         $expectedUri = 'https://api.clickatell.com/http/sendmsg?api_id=api_id&user=user&password=password&to=1234567890&text=hello';
-        $response = new \Zend\Http\Response();
+        $response = new \Laminas\Http\Response();
         $response->setStatusCode(404);
         $client->expects($this->once())->method('setMethod')->with($this->equalTo('GET'))->will($this->returnValue($client));
         $client->expects($this->once())->method('setUri')->with($this->equalTo($expectedUri))->will($this->returnValue($client));
@@ -134,12 +135,12 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
      * Test an exception in the mail client
      *
      * @return void
-     *
-     * @expectedException        VuFind\Exception\Mail
-     * @expectedExceptionMessage Foo
      */
     public function testClientException()
     {
+        $this->expectException(\VuFind\Exception\Mail::class);
+        $this->expectExceptionMessage('Foo');
+
         $client = $this->getMockClient();
         $expectedUri = 'https://api.clickatell.com/http/sendmsg?api_id=api_id&user=user&password=password&to=1234567890&text=hello';
         $client->expects($this->once())->method('setMethod')->with($this->equalTo('GET'))->will($this->returnValue($client));
@@ -152,7 +153,7 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
     /**
      * Build a test object
      *
-     * @param \Zend\Http\Client $client HTTP client (null for default)
+     * @param \Laminas\Http\Client $client HTTP client (null for default)
      * @param array             $config Configuration (null for default)
      *
      * @return Clickatell
@@ -166,7 +167,7 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
             $client = $this->getMockClient();
         }
         return new Clickatell(
-            new \Zend\Config\Config($config),
+            new \Laminas\Config\Config($config),
             ['client' => $client]
         );
     }
@@ -190,10 +191,10 @@ class ClickatellTest extends \VuFindTest\Unit\TestCase
     /**
      * Get a mock HTTP client
      *
-     * @return \Zend\Http\Client
+     * @return \Laminas\Http\Client
      */
     protected function getMockClient()
     {
-        return $this->getMock('Zend\Http\Client');
+        return $this->createMock(\Laminas\Http\Client::class);
     }
 }

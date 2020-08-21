@@ -3,7 +3,7 @@
 /**
  * Unit tests for WorldCat backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,31 +18,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\WorldCat;
 
+use InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
 use VuFindSearch\Backend\WorldCat\Backend;
 use VuFindSearch\Query\Query;
-use PHPUnit_Framework_TestCase;
-use InvalidArgumentException;
 
 /**
  * Unit tests for WorldCat backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class BackendTest extends PHPUnit_Framework_TestCase
+class BackendTest extends TestCase
 {
     /**
      * Test retrieving a record.
@@ -113,7 +113,7 @@ class BackendTest extends PHPUnit_Framework_TestCase
      */
     public function testConstructorSetters()
     {
-        $fact = $this->getMock('VuFindSearch\Response\RecordCollectionFactoryInterface');
+        $fact = $this->createMock(\VuFindSearch\Response\RecordCollectionFactoryInterface::class);
         $conn = $this->getConnectorMock();
         $back = new Backend($conn, $fact);
         $this->assertEquals($fact, $back->getRecordCollectionFactory());
@@ -149,10 +149,10 @@ class BackendTest extends PHPUnit_Framework_TestCase
      */
     protected function getConnectorMock(array $mock = [])
     {
-        $client = $this->getMock('Zend\Http\Client');
-        return $this->getMock(
-            'VuFindSearch\Backend\WorldCat\Connector',
-            $mock, ['fake', $client]
-        );
+        $client = $this->createMock(\Laminas\Http\Client::class);
+        return $this->getMockBuilder(\VuFindSearch\Backend\WorldCat\Connector::class)
+            ->setMethods($mock)
+            ->setConstructorArgs(['fake', $client])
+            ->getMock();
     }
 }

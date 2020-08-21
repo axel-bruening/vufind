@@ -2,7 +2,7 @@
 /**
  * IP address utility functions.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) The National Library of Finland 2015.
  *
@@ -17,32 +17,32 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
- * @package  Authorization
+ * @category VuFind
+ * @package  Net
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Net;
 
 /**
  * IP address utility functions.
  *
- * @category VuFind2
- * @package  Authorization
+ * @category VuFind
+ * @package  Net
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class IpAddressUtils
 {
     /**
      * Normalize an IP address or a beginning of it to an IPv6 address
      *
-     * @param string  $ip  IP Address
-     * @param boolean $end Whether to make a partial address  an "end of range"
+     * @param string $ip  IP Address
+     * @param bool   $end Whether to make a partial address  an "end of range"
      * address
      *
      * @return string|false Packed in_addr representation if successful, false

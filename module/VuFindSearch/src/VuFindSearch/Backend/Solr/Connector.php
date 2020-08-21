@@ -3,7 +3,7 @@
 /**
  * SOLR connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,55 +18,59 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Andrew S. Nagy <vufind-tech@lists.sourceforge.net>
  * @author   David Maus <maus@hab.de>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\Solr;
 
-use VuFindSearch\Query\Query;
+use InvalidArgumentException;
 
-use VuFindSearch\ParamBag;
+use Laminas\Http\Client\Adapter\AdapterInterface;
+use Laminas\Http\Client\Adapter\Exception\TimeoutException;
+use Laminas\Http\Client as HttpClient;
+use Laminas\Http\Request;
+
+use VuFindSearch\Backend\Exception\BackendException;
 
 use VuFindSearch\Backend\Exception\HttpErrorException;
 
+use VuFindSearch\Backend\Exception\RemoteErrorException;
+use VuFindSearch\Backend\Exception\RequestErrorException;
 use VuFindSearch\Backend\Solr\Document\AbstractDocument;
+use VuFindSearch\ParamBag;
 
-use Zend\Http\Request;
-use Zend\Http\Client as HttpClient;
-use Zend\Http\Client\Adapter\AdapterInterface;
-
-use InvalidArgumentException;
+use VuFindSearch\Query\Query;
 
 /**
  * SOLR connector.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Andrew S. Nagy <vufind-tech@lists.sourceforge.net>
  * @author   David Maus <maus@hab.de>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class Connector implements \Zend\Log\LoggerAwareInterface
+class Connector implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
     /**
      * Maximum length of a GET url.
      *
-     * Switches to POST if the SOLR target URL exeeds this length.
+     * Switches to POST if the SOLR target URL exceeds this length.
      *
-     * @see self::query()
+     * @see \VuFindSearch\Backend\Solr\Connector::query()
      *
-     * @var integer
+     * @var int
      */
     const MAX_GET_URL_LENGTH = 2048;
 
@@ -112,7 +116,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      *
      * @var string|AdapterInterface
      */
-    protected $adapter = 'Zend\Http\Client\Adapter\Socket';
+    protected $adapter = 'Laminas\Http\Client\Adapter\Socket';
 
     /**
      * Constructor
@@ -185,23 +189,20 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * Return records similar to a given record specified by id.
      *
-     * Uses MoreLikeThis Request Handler
+     * Uses MoreLikeThis Request Component or MoreLikeThis Handler
      *
-     * @param string   $id     Id of given record
+     * @param string   $id     ID of given record (not currently used, but
+     * retained for backward compatibility / extensibility).
      * @param ParamBag $params Parameters
      *
      * @return string
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function similar($id, ParamBag $params = null)
+    public function similar($id, ParamBag $params)
     {
-        $params = $params ?: new ParamBag();
-        $params
-            ->set('q', sprintf('%s:"%s"', $this->uniqueKey, addcslashes($id, '"')));
-        $params->set('qt', 'morelikethis');
-
         $handler = $this->map->getHandler(__FUNCTION__);
         $this->map->prepare(__FUNCTION__, $params);
-
         return $this->query($handler, $params);
     }
 
@@ -365,6 +366,39 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     }
 
     /**
+     * Check if an exception from a Solr request should be thrown rather than retried
+     *
+     * @param \Exception $ex Exception
+     *
+     * @return bool
+     */
+    protected function isRethrowableSolrException($ex)
+    {
+        return $ex instanceof TimeoutException
+            || $ex instanceof RequestErrorException;
+    }
+
+    /**
+     * If an unexpected exception type was received, wrap it in a generic
+     * BackendException to standardize upstream handling.
+     *
+     * @param \Exception $ex Exception
+     *
+     * @return \Exception
+     */
+    protected function forceToBackendException($ex)
+    {
+        // Don't wrap specific backend exceptions....
+        if ($ex instanceof RemoteErrorException
+            || $ex instanceof RequestErrorException
+            || $ex instanceof HttpErrorException
+        ) {
+            return $ex;
+        }
+        return new BackendException('Problem connecting to Solr.', null, $ex);
+    }
+
+    /**
      * Try all Solr URLs until we find one that works (or throw an exception).
      *
      * @param string   $method    HTTP method to use
@@ -391,13 +425,16 @@ class Connector implements \Zend\Log\LoggerAwareInterface
             try {
                 return $this->send($client);
             } catch (\Exception $ex) {
+                if ($this->isRethrowableSolrException($ex)) {
+                    throw $this->forceToBackendException($ex);
+                }
                 $exception = $ex;
             }
         }
 
-        // If we got this far, everything failed -- throw the most recent
-        // exception caught above.
-        throw $exception;
+        // If we got this far, everything failed -- throw a BackendException with
+        // the most recent exception caught above set as the previous exception.
+        throw $this->forceToBackendException($exception);
     }
 
     /**

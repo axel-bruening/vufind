@@ -3,7 +3,7 @@
 /**
  * Unit tests for WorldCat backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,13 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\WorldCat\Response\XML;
 
@@ -33,24 +33,24 @@ use VuFindSearch\Backend\WorldCat\Response\XML\RecordCollectionFactory;
 /**
  * Unit tests for WorldCat backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class RecordCollectionFactoryTest extends \PHPUnit_Framework_TestCase
+class RecordCollectionFactoryTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Test bad callback.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Exception\InvalidArgumentException
-     * @expectedExceptionMessage Record factory must be callable.
      */
     public function testBadCallback()
     {
+        $this->expectException(\VuFindSearch\Exception\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Record factory must be callable.');
+
         $x = new RecordCollectionFactory('bad');
     }
 
@@ -58,12 +58,12 @@ class RecordCollectionFactoryTest extends \PHPUnit_Framework_TestCase
      * Test bad factory input.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Exception\InvalidArgumentException
-     * @expectedExceptionMessage Unexpected type of value: Expected array, got string
      */
     public function testBadFactoryInput()
     {
+        $this->expectException(\VuFindSearch\Exception\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unexpected type of value: Expected array, got string');
+
         $x = new RecordCollectionFactory();
         $x->factory('bad');
     }

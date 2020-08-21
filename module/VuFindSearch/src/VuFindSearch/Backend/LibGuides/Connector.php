@@ -3,7 +3,7 @@
 /**
  * LibGuides connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,29 +18,30 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Chelsea Lobdell <clobdel1@swarthmore.edu>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\LibGuides;
-use Zend\Http\Client as HttpClient;
+
+use Laminas\Http\Client as HttpClient;
 
 /**
  * LibGuides connector.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Chelsea Lobdell <clobdel1@swarthmore.edu>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class Connector implements \Zend\Log\LoggerAwareInterface
+class Connector implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
@@ -80,14 +81,18 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      * @param string     $iid        Institution ID
      * @param HttpClient $client     HTTP client
      * @param float      $apiVersion API version number
+     * @param string     $baseUrl    API base URL (optional)
      */
-    public function __construct($iid, $client, $apiVersion = 1)
+    public function __construct($iid, $client, $apiVersion = 1, $baseUrl = null)
     {
         $this->apiVersion = $apiVersion;
-        if ($this->apiVersion < 2) {
-            $this->host = "http://api.libguides.com/api_search.php?";
+        if (empty($baseUrl)) {
+            $this->host = ($this->apiVersion < 2)
+                ? "http://api.libguides.com/api_search.php?"
+                : "http://lgapi.libapps.com/widgets.php?";
         } else {
-            $this->host = "http://lgapi.libapps.com/widgets.php?";
+            // Ensure appropriate number of question marks:
+            $this->host = rtrim($baseUrl, '?') . '?';
         }
         $this->iid = $iid;
         $this->client = $client;

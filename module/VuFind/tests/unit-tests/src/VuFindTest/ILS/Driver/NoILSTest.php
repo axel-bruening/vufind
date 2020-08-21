@@ -2,7 +2,7 @@
 /**
  * ILS driver test
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\ILS\Driver;
+
 use VuFind\ILS\Driver\NoILS;
 
 /**
  * ILS driver test
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class NoILSTest extends \VuFindTest\Unit\TestCase
 {
@@ -58,15 +59,15 @@ class NoILSTest extends \VuFindTest\Unit\TestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
-        $this->loader = $this->getMock(
-            'VuFind\Record\Loader', [],
-            [
-                $this->getMock('VuFindSearch\Service'),
-                $this->getMock('VuFind\RecordDriver\PluginManager')
-            ]
-        );
+        $this->loader = $this->getMockBuilder(\VuFind\Record\Loader::class)
+            ->setConstructorArgs(
+                [
+                    $this->createMock(\VuFindSearch\Service::class),
+                    $this->createMock(\VuFind\RecordDriver\PluginManager::class)
+                ]
+            )->getMock();
         $this->driver = new NoILS($this->loader);
         $this->driver->init();
     }
@@ -102,14 +103,27 @@ class NoILSTest extends \VuFindTest\Unit\TestCase
     }
 
     /**
-     * Test that driver makes holdings visible when in MARC mode.
+     * Test that driver makes holdings visible when in custom mode.
      *
      * @return void
      */
-    public function testMarcHoldingsVisibility()
+    public function testCustomHoldingsVisibility()
     {
-        $this->driver
-            ->setConfig(['settings' => ['useHoldings' => 'marc']]);
+        $this->driver->setConfig(
+            [
+                'settings' => ['useHoldings' => 'custom'],
+                'Holdings' => [
+                    'number' => 0,
+                    'availability' => false,
+                    'status' => 'foo',
+                    'use_unknown_message' => true,
+                    'location' => 'bar',
+                    'reserve' => 'N',
+                    'callnumber' => 'xyzzy',
+                    'barcode' => null,
+                ]
+            ]
+        );
         $this->assertTrue($this->driver->hasHoldings('foo'));
     }
 

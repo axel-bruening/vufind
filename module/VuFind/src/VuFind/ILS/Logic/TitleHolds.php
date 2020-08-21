@@ -2,7 +2,7 @@
 /**
  * Title Hold Logic Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -17,27 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Logic
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\ILS\Logic;
+
+use VuFind\Exception\ILS as ILSException;
 use VuFind\ILS\Connection as ILSConnection;
 
 /**
  * Title Hold Logic Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Logic
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class TitleHolds
 {
@@ -65,7 +67,7 @@ class TitleHolds
     /**
      * VuFind configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config;
 
@@ -82,10 +84,10 @@ class TitleHolds
      * @param \VuFind\Auth\ILSAuthenticator $ilsAuth ILS authenticator
      * @param ILSConnection                 $ils     A catalog connection
      * @param \VuFind\Crypt\HMAC            $hmac    HMAC generator
-     * @param \Zend\Config\Config           $config  VuFind configuration
+     * @param \Laminas\Config\Config        $config  VuFind configuration
      */
     public function __construct(\VuFind\Auth\ILSAuthenticator $ilsAuth,
-        ILSConnection $ils, \VuFind\Crypt\HMAC $hmac, \Zend\Config\Config $config
+        ILSConnection $ils, \VuFind\Crypt\HMAC $hmac, \Laminas\Config\Config $config
     ) {
         $this->ilsAuth = $ilsAuth;
         $this->hmac = $hmac;
@@ -106,6 +108,8 @@ class TitleHolds
      * @param string $id A Bib ID
      *
      * @return string|bool URL to place hold, or false if hold option unavailable
+     *
+     * @todo Indicate login failure or ILS connection failure somehow?
      */
     public function getHold($id)
     {
@@ -113,15 +117,23 @@ class TitleHolds
         if ($this->catalog) {
             $mode = $this->catalog->getTitleHoldsMode();
             if ($mode == 'disabled') {
-                 return false;
-            } else if ($mode == 'driver') {
-                $patron = $this->ilsAuth->storedCatalogLogin();
-                if (!$patron) {
+                return false;
+            } elseif ($mode == 'driver') {
+                try {
+                    $patron = $this->ilsAuth->storedCatalogLogin();
+                    if (!$patron) {
+                        return false;
+                    }
+                    return $this->driverHold($id, $patron);
+                } catch (ILSException $e) {
                     return false;
                 }
-                return $this->driverHold($id, $patron);
             } else {
-                $patron = $this->ilsAuth->storedCatalogLogin();
+                try {
+                    $patron = $this->ilsAuth->storedCatalogLogin();
+                } catch (ILSException $e) {
+                    $patron = false;
+                }
                 $mode = $this->checkOverrideMode($id, $mode);
                 return $this->generateHold($id, $mode, $patron);
             }
@@ -143,7 +155,7 @@ class TitleHolds
         static $holdings = [];
 
         if (!isset($holdings[$id])) {
-            $holdings[$id] = $this->catalog->getHolding($id);
+            $holdings[$id] = $this->catalog->getHolding($id)['holdings'];
         }
         return $holdings[$id];
     }
@@ -194,14 +206,13 @@ class TitleHolds
         $checkHolds = $this->catalog->checkFunction(
             'Holds', compact('id', 'patron')
         );
-        $data = [
-            'id' => $id,
-            'level' => 'title'
-        ];
 
-        if ($checkHolds != false) {
-            $valid = $this->catalog->checkRequestIsValid($id, $data, $patron);
-            if ($valid) {
+        if (isset($checkHolds['HMACKeys'])) {
+            $data = ['id' => $id, 'level' => 'title'];
+            $result = $this->catalog->checkRequestIsValid($id, $data, $patron);
+            if ((is_array($result) && $result['valid'])
+                || (is_bool($result) && $result)
+            ) {
                 return $this->getHoldDetails($data, $checkHolds['HMACKeys']);
             }
         }
@@ -235,9 +246,8 @@ class TitleHolds
 
         if ($checkHolds != false) {
             if ($type == 'always') {
-                 $addlink = true;
+                $addlink = true;
             } elseif ($type == 'availability') {
-
                 $holdings = $this->getHoldings($id);
                 foreach ($holdings as $holding) {
                     if ($holding['availability']

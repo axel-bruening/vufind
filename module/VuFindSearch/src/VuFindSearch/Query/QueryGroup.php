@@ -3,7 +3,7 @@
 /**
  * A group of single/simples queries, joined by boolean operator.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,13 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Query;
 
@@ -33,11 +33,11 @@ use VuFindSearch\Exception\InvalidArgumentException;
 /**
  * A group of single/simples queries, joined by boolean operator.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class QueryGroup extends AbstractQuery
 {
@@ -51,7 +51,7 @@ class QueryGroup extends AbstractQuery
     /**
      * Name of the handler to be used if the query group is reduced.
      *
-     * @see VuFindSearch\Backend\Solr\QueryBuilder::reduceQueryGroup()
+     * @see \VuFindSearch\Backend\Solr\QueryBuilder::reduceQueryGroup()
      *
      * @var string
      *
@@ -69,7 +69,7 @@ class QueryGroup extends AbstractQuery
     /**
      * Is the query group negated?
      *
-     * @var boolean
+     * @var bool
      */
     protected $negation;
 
@@ -106,7 +106,7 @@ class QueryGroup extends AbstractQuery
     {
         $new = [];
         foreach ($this->queries as $q) {
-            $new[] = clone($q);
+            $new[] = clone $q;
         }
         $this->queries = $new;
     }
@@ -229,7 +229,7 @@ class QueryGroup extends AbstractQuery
     /**
      * Return true if group is an exclusion group.
      *
-     * @return boolean
+     * @return bool
      */
     public function isNegated()
     {
@@ -254,6 +254,23 @@ class QueryGroup extends AbstractQuery
     }
 
     /**
+     * Does the query contain the specified term when comparing normalized strings?
+     *
+     * @param string $needle Term to check
+     *
+     * @return bool
+     */
+    public function containsNormalizedTerm($needle)
+    {
+        foreach ($this->getQueries() as $q) {
+            if ($q->containsNormalizedTerm($needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Get a concatenated list of all query strings within the object.
      *
      * @return string
@@ -270,15 +287,16 @@ class QueryGroup extends AbstractQuery
     /**
      * Replace a term.
      *
-     * @param string $from Search term to find
-     * @param string $to   Search term to insert
+     * @param string  $from      Search term to find
+     * @param string  $to        Search term to insert
+     * @param boolean $normalize If we should apply text normalization when replacing
      *
      * @return void
      */
-    public function replaceTerm($from, $to)
+    public function replaceTerm($from, $to, $normalize = false)
     {
         foreach ($this->getQueries() as $q) {
-            $q->replaceTerm($from, $to);
+            $q->replaceTerm($from, $to, $normalize);
         }
     }
 }

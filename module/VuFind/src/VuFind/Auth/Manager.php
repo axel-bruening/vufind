@@ -2,7 +2,7 @@
 /**
  * Wrapper class for handling logged-in user in session.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -17,30 +17,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Auth;
-use VuFind\Cookie\CookieManager,
-    VuFind\Db\Row\User as UserRow, VuFind\Db\Table\User as UserTable,
-    VuFind\Exception\Auth as AuthException,
-    Zend\Config\Config, Zend\Session\SessionManager;
+
+use Laminas\Config\Config;
+use Laminas\Session\SessionManager;
+use VuFind\Cookie\CookieManager;
+use VuFind\Db\Row\User as UserRow;
+use VuFind\Db\Table\User as UserTable;
+use VuFind\Exception\Auth as AuthException;
+use VuFind\Validator\Csrf;
 
 /**
  * Wrapper class for handling logged-in user in session.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
-class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
+class Manager implements \LmcRbacMvc\Identity\IdentityProviderInterface
 {
     /**
      * Authentication modules
@@ -57,7 +61,7 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     protected $activeAuth;
 
     /**
-     * Whitelist of values allowed to be set into $activeAuth
+     * List of values allowed to be set into $activeAuth
      *
      * @var array
      */
@@ -73,7 +77,7 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     /**
      * Session container
      *
-     * @var \Zend\Session\Container
+     * @var \Laminas\Session\Container
      */
     protected $session;
 
@@ -120,10 +124,11 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
      * @param SessionManager $sessionManager Session manager
      * @param PluginManager  $pm             Authentication plugin manager
      * @param CookieManager  $cookieManager  Cookie manager
+     * @param Csrf           $csrf           CSRF validator
      */
     public function __construct(Config $config, UserTable $userTable,
         SessionManager $sessionManager, PluginManager $pm,
-        CookieManager $cookieManager
+        CookieManager $cookieManager, Csrf $csrf
     ) {
         // Store dependencies:
         $this->config = $config;
@@ -131,14 +136,14 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
         $this->sessionManager = $sessionManager;
         $this->pluginManager = $pm;
         $this->cookieManager = $cookieManager;
+        $this->csrf = $csrf;
 
         // Set up session:
-        $this->session = new \Zend\Session\Container('Account');
+        $this->session = new \Laminas\Session\Container('Account', $sessionManager);
 
         // Initialize active authentication setting (defaulting to Database
         // if no setting passed in):
-        $method = isset($config->Authentication->method)
-            ? $config->Authentication->method : 'Database';
+        $method = $config->Authentication->method ?? 'Database';
         $this->legalAuthOptions = [$method];   // mark it as legal
         $this->setAuthMethod($method);              // load it
     }
@@ -200,28 +205,35 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
      */
     public function supportsRecovery($authMethod = null)
     {
-        if ($this->getAuth($authMethod)->supportsPasswordRecovery()) {
-            return isset($this->config->Authentication->recover_password)
-                && $this->config->Authentication->recover_password;
-        }
-        return false;
+        return ($this->config->Authentication->recover_password ?? false)
+            && $this->getAuth($authMethod)->supportsPasswordRecovery();
+    }
+
+    /**
+     * Is email changing currently allowed?
+     *
+     * @param string $authMethod optional; check this auth method rather than
+     * the one in config file
+     *
+     * @return bool
+     */
+    public function supportsEmailChange($authMethod = null)
+    {
+        return $this->config->Authentication->change_email ?? false;
     }
 
     /**
      * Is new passwords currently allowed?
      *
      * @param string $authMethod optional; check this auth method rather than
-     *  the one in config file
+     * the one in config file
      *
      * @return bool
      */
     public function supportsPasswordChange($authMethod = null)
     {
-        if ($this->getAuth($authMethod)->supportsPasswordChange()) {
-            return isset($this->config->Authentication->change_password)
-                && $this->config->Authentication->change_password;
-        }
-        return false;
+        return ($this->config->Authentication->change_password ?? false)
+            && $this->getAuth($authMethod)->supportsPasswordChange();
     }
 
     /**
@@ -350,9 +362,29 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     public function loginEnabled()
     {
         // Assume login is enabled unless explicitly turned off:
-        return isset($this->config->Authentication->hideLogin)
-            ? !$this->config->Authentication->hideLogin
-            : true;
+        return !($this->config->Authentication->hideLogin ?? false);
+    }
+
+    /**
+     * Is login currently allowed?
+     *
+     * @return bool
+     */
+    public function ajaxEnabled()
+    {
+        // Assume ajax is enabled unless explicitly turned off:
+        return $this->config->Authentication->enableAjax ?? true;
+    }
+
+    /**
+     * Is login currently allowed?
+     *
+     * @return bool
+     */
+    public function dropdownEnabled()
+    {
+        // Assume dropdown is disabled unless explicitly turned on:
+        return $this->config->Authentication->enableDropdown ?? false;
     }
 
     /**
@@ -374,6 +406,7 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
         // Clear out the cached user object and session entry.
         $this->currentUser = false;
         unset($this->session->userId);
+        unset($this->session->userDetails);
         $this->cookieManager->set('loggedOut', 1);
 
         // Destroy the session for good measure, if requested.
@@ -381,7 +414,7 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
             $this->sessionManager->destroy();
         } else {
             // If we don't want to destroy the session, we still need to empty it.
-            // There should be a way to do this through Zend\Session, but there
+            // There should be a way to do this through Laminas\Session, but there
             // apparently isn't (TODO -- do this better):
             $_SESSION = [];
         }
@@ -408,19 +441,48 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     {
         // If user object is not in cache, but user ID is in session,
         // load the object from the database:
-        if (!$this->currentUser && isset($this->session->userId)) {
-            $results = $this->userTable
-                ->select(['id' => $this->session->userId]);
-            $this->currentUser = count($results) < 1
-                ? false : $results->current();
+        if (!$this->currentUser) {
+            if (isset($this->session->userId)) {
+                // normal mode
+                $results = $this->userTable
+                    ->select(['id' => $this->session->userId]);
+                $this->currentUser = count($results) < 1
+                    ? false : $results->current();
+            } elseif (isset($this->session->userDetails)) {
+                // privacy mode
+                $results = $this->userTable->createRow();
+                $results->exchangeArray($this->session->userDetails);
+                $this->currentUser = $results;
+            } else {
+                // unexpected state
+                $this->currentUser = false;
+            }
         }
         return $this->currentUser;
     }
 
     /**
+     * Retrieve CSRF token
+     *
+     * If no CSRF token currently exists, or should be regenerated, generates one.
+     *
+     * @param bool $regenerate Should we regenerate token? (default false)
+     * @param int  $maxTokens  The maximum number of tokens to store in the
+     * session.
+     *
+     * @return string
+     */
+    public function getCsrfHash($regenerate = false, $maxTokens = 5)
+    {
+        // Reset token store if we've overflowed the limit:
+        $this->csrf->trimTokenList($maxTokens);
+        return $this->csrf->getHash($regenerate);
+    }
+
+    /**
      * Get the identity
      *
-     * @return \ZfcRbac\Identity\IdentityInterface|null
+     * @return \LmcRbacMvc\Identity\IdentityInterface|null
      */
     public function getIdentity()
     {
@@ -442,6 +504,16 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     }
 
     /**
+     * Are we in privacy mode?
+     *
+     * @return bool
+     */
+    public function inPrivacyMode()
+    {
+        return $this->config->Authentication->privacy ?? false;
+    }
+
+    /**
      * Updates the user information in the session.
      *
      * @param UserRow $user User object to store in the session
@@ -451,14 +523,18 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     public function updateSession($user)
     {
         $this->currentUser = $user;
-        $this->session->userId = $user->id;
+        if ($this->inPrivacyMode()) {
+            $this->session->userDetails = $user->toArray();
+        } else {
+            $this->session->userId = $user->id;
+        }
         $this->cookieManager->clear('loggedOut');
     }
 
     /**
      * Create a new user account from the request.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * new account details.
      *
      * @throws AuthException
@@ -467,6 +543,7 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     public function create($request)
     {
         $user = $this->getAuth()->create($request);
+        $this->updateUser($user);
         $this->updateSession($user);
         return $user;
     }
@@ -474,7 +551,7 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     /**
      * Update a user's password from the request.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * password change details.
      *
      * @throws AuthException
@@ -488,17 +565,66 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     }
 
     /**
+     * Update a user's email from the request.
+     *
+     * @param UserRow $user  Object representing user being updated.
+     * @param string  $email New email address to set (must be pre-validated!).
+     *
+     * @throws AuthException
+     * @return void
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function updateEmail(UserRow $user, $email)
+    {
+        // Depending on verification setting, either do a direct update or else
+        // put the new address into a pending state.
+        if ($this->config->Authentication->verify_email ?? false) {
+            $user->pending_email = $email;
+        } else {
+            $user->updateEmail($email, true);
+        }
+        $user->save();
+        $this->updateSession($user);
+    }
+
+    /**
      * Try to log in the user using current query parameters; return User object
      * on success, throws exception on failure.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * account credentials.
      *
      * @throws AuthException
+     * @throws \VuFind\Exception\PasswordSecurity
+     * @throws \VuFind\Exception\AuthInProgress
      * @return UserRow Object representing logged-in user.
      */
     public function login($request)
     {
+        // Allow the auth module to inspect the request (used by ChoiceAuth,
+        // for example):
+        $this->getAuth()->preLoginCheck($request);
+
+        // Check if the current auth method wants to delegate the request to another
+        // method:
+        if ($delegate = $this->getAuth()->getDelegateAuthMethod($request)) {
+            $this->setAuthMethod($delegate, true);
+        }
+
+        // Validate CSRF for form-based authentication methods:
+        if (!$this->getAuth()->getSessionInitiator(null)
+            && $this->getAuth()->needsCsrfCheck($request)
+        ) {
+            if (!$this->csrf->isValid($request->getPost()->get('csrf'))) {
+                $this->getAuth()->resetState();
+                throw new AuthException('authentication_error_technical');
+            } else {
+                // After successful token verification, clear list to shrink session:
+                $this->csrf->trimTokenList(0);
+            }
+        }
+
         // Perform authentication:
         try {
             $user = $this->getAuth()->authenticate($request);
@@ -518,6 +644,9 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
             throw new AuthException('authentication_error_technical');
         }
 
+        // Update user object
+        $this->updateUser($user);
+
         // Store the user in the session and send it back to the caller:
         $this->updateSession($user);
         return $user;
@@ -526,17 +655,24 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     /**
      * Setter
      *
-     * @param string $method The auth class to proxy
+     * @param string $method     The auth class to proxy
+     * @param bool   $forceLegal Whether to force the new method legal
      *
      * @return void
      */
-    public function setAuthMethod($method)
+    public function setAuthMethod($method, $forceLegal = false)
     {
         // Change the setting:
         $this->activeAuth = $method;
 
+        if ($forceLegal) {
+            if (!in_array($method, $this->legalAuthOptions)) {
+                $this->legalAuthOptions[] = $method;
+            }
+        }
+
         // If this method supports switching to a different method and we haven't
-        // already initialized it, add those options to the whitelist. If the object
+        // already initialized it, add those options to the legal list. If the object
         // is already initialized, that means we've already gone through this step
         // and can save ourselves the trouble.
 
@@ -551,12 +687,13 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
             );
         }
     }
+
     /**
      * Validate the credentials in the provided request, but do not change the state
      * of the current logged-in user. Return true for valid credentials, false
      * otherwise.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * account credentials.
      *
      * @throws AuthException
@@ -565,5 +702,40 @@ class Manager implements \ZfcRbac\Identity\IdentityProviderInterface
     public function validateCredentials($request)
     {
         return $this->getAuth()->validateCredentials($request);
+    }
+
+    /**
+     * What login method does the ILS use (password, email, vufind)
+     *
+     * @param string $target Login target (MultiILS only)
+     *
+     * @return array|false
+     */
+    public function getILSLoginMethod($target = '')
+    {
+        $auth = $this->getAuth();
+        if (is_callable([$auth, 'getILSLoginMethod'])) {
+            return $auth->getILSLoginMethod($target);
+        }
+        return false;
+    }
+
+    /**
+     * Update common user attributes on login
+     *
+     * @param \VuFind\Db\Row\User $user User object
+     *
+     * @return void
+     */
+    protected function updateUser($user)
+    {
+        if ($this->getAuth() instanceof ChoiceAuth) {
+            $method = $this->getAuth()->getSelectedAuthOption();
+        } else {
+            $method = $this->activeAuth;
+        }
+        $user->auth_method = strtolower($method);
+        $user->last_login = date('Y-m-d H:i:s');
+        $user->save();
     }
 }

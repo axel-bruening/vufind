@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Sierra (III) ILS Driver for Vufind2
+ * Sierra (III) ILS Driver for VuFind
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) 2013 Julia Bauder
  *
@@ -20,25 +20,25 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/GPL-3.0 GNU General Public License
- * @link     http://vufind.org/wiki/building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 namespace VuFind\ILS\Driver;
 
-use VuFind\Exception\ILS as ILSException,
-    VuFind\I18n\Translator\TranslatorAwareInterface;
+use VuFind\Exception\ILS as ILSException;
+use VuFind\I18n\Translator\TranslatorAwareInterface;
 
 /**
- * Sierra (III) ILS Driver for Vufind2
+ * Sierra (III) ILS Driver for VuFind
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/GPL-3.0 GNU General Public License
- * @link     http://vufind.org/wiki/building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 class Sierra extends AbstractBase implements TranslatorAwareInterface
 {
@@ -107,7 +107,10 @@ class Sierra extends AbstractBase implements TranslatorAwareInterface
             . "FROM sierra_view.bib_view "
             . "LEFT JOIN sierra_view.bib_record_item_record_link ON "
             . "(bib_view.id = bib_record_item_record_link.bib_record_id) "
-            . "WHERE bib_view.record_num = $1;";
+            . "INNER JOIN sierra_view.item_view ON "
+            . "(bib_record_item_record_link.item_record_id = item_view.id) "
+            . "WHERE bib_view.record_num = $1 "
+            . "AND item_view.is_suppressed = false;";
         $record_ids = pg_query_params(
             $this->db, $get_record_ids_query, [$this->idStrip($id)]
         );
@@ -458,16 +461,19 @@ class Sierra extends AbstractBase implements TranslatorAwareInterface
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
      * @throws DateException
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         try {
             $holdings = [];
@@ -566,7 +572,7 @@ class Sierra extends AbstractBase implements TranslatorAwareInterface
         try {
             $newItems = [];
             $offset = $limit * ($page - 1);
-            $daysOld = (int) $daysOld;
+            $daysOld = (int)$daysOld;
             if (is_int($daysOld) == false || $daysOld > 30) {
                 $daysOld = "30";
             }
@@ -604,7 +610,7 @@ class Sierra extends AbstractBase implements TranslatorAwareInterface
                     $this->db, $query, [$limit, $offset]
                 );
             }
-            $newItems['count'] = (string) pg_num_rows($results);
+            $newItems['count'] = (string)pg_num_rows($results);
             if (pg_num_rows($results) != 0) {
                 while ($record = pg_fetch_row($results)) {
                     $bareNumber = $record[0];

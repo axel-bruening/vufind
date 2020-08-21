@@ -2,7 +2,7 @@
 /**
  * Row Definition for user
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,33 +17,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Row
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Db\Row;
-use Zend\Db\Sql\Expression,
-    Zend\Db\Sql\Predicate\Predicate,
-    Zend\Db\Sql\Sql,
-    Zend\Crypt\Symmetric\Mcrypt,
-    Zend\Crypt\Password\Bcrypt,
-    Zend\Crypt\BlockCipher as BlockCipher;
+
+use Laminas\Crypt\BlockCipher as BlockCipher;
+use Laminas\Crypt\Symmetric\Openssl;
+use Laminas\Db\Sql\Expression;
 
 /**
  * Row Definition for user
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Row
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
-    \ZfcRbac\Identity\IdentityInterface
+    \LmcRbacMvc\Identity\IdentityInterface
 {
     use \VuFind\Db\Table\DbTableAwareTrait;
 
@@ -64,14 +62,14 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     /**
      * VuFind configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config = null;
 
     /**
      * Constructor
      *
-     * @param \Zend\Db\Adapter\Adapter $adapter Database adapter
+     * @param \Laminas\Db\Adapter\Adapter $adapter Database adapter
      */
     public function __construct($adapter)
     {
@@ -81,11 +79,11 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     /**
      * Configuration setter
      *
-     * @param \Zend\Config\Config $config VuFind configuration
+     * @param \Laminas\Config\Config $config VuFind configuration
      *
      * @return void
      */
-    public function setConfig(\Zend\Config\Config $config)
+    public function setConfig(\Laminas\Config\Config $config)
     {
         $this->config = $config;
     }
@@ -100,6 +98,20 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
         $this->cat_username = null;
         $this->cat_password = null;
         $this->cat_pass_enc = null;
+    }
+
+    /**
+     * Save ILS ID.
+     *
+     * @param string $catId Catalog ID to save.
+     *
+     * @return mixed        The output of the save method.
+     * @throws \VuFind\Exception\PasswordSecurity
+     */
+    public function saveCatalogId($catId)
+    {
+        $this->cat_id = $catId;
+        return $this->save();
     }
 
     /**
@@ -132,6 +144,23 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     }
 
     /**
+     * Save date/time when email address has been verified.
+     *
+     * @param string $datetime optional date/time to save.
+     *
+     * @return mixed           The output of the save method.
+     */
+    public function saveEmailVerified($datetime=null)
+    {
+        if ($datetime === null) {
+            $datetime = date('Y-m-d H:i:s');
+        }
+
+        $this->email_verified = $datetime;
+        return $this->save();
+    }
+
+    /**
      * This is a getter for the Catalog Password. It will return a plaintext version
      * of the password.
      *
@@ -140,9 +169,11 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
      */
     public function getCatPassword()
     {
-        return $this->passwordEncryptionEnabled()
-            ? $this->encryptOrDecrypt($this->cat_pass_enc, false)
-            : (isset($this->cat_password) ? $this->cat_password : null);
+        if ($this->passwordEncryptionEnabled()) {
+            return isset($this->cat_pass_enc)
+                ? $this->encryptOrDecrypt($this->cat_pass_enc, false) : null;
+        }
+        return isset($this->cat_password) ? $this->cat_password : null;
     }
 
     /**
@@ -191,7 +222,10 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
         }
 
         // Perform encryption:
-        $cipher = new BlockCipher(new Mcrypt(['algorithm' => 'blowfish']));
+        $algo = isset($this->config->Authentication->ils_encryption_algo)
+            ? $this->config->Authentication->ils_encryption_algo
+            : 'blowfish';
+        $cipher = new BlockCipher(new Openssl(['algorithm' => $algo]));
         $cipher->setKey($this->encryptionKey);
         return $encrypt ? $cipher->encrypt($text) : $cipher->decrypt($text);
     }
@@ -211,6 +245,16 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     }
 
     /**
+     * Check whether the email address has been verified yet.
+     *
+     * @return bool
+     */
+    public function checkEmailVerified()
+    {
+        return !empty($this->email_verified);
+    }
+
+    /**
      * Get a list of all tags generated by the user in favorites lists.  Note that
      * the returned list WILL NOT include tags attached to records that are not
      * saved in favorites lists.
@@ -220,56 +264,27 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
      * @param int    $listId     Filter for tags tied to a specific list (null for no
      * filter).
      * @param string $source     Filter for tags tied to a specific record source.
+     * (null for no filter).
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
-    public function getTags($resourceId = null, $listId = null, $source = 'VuFind')
+    public function getTags($resourceId = null, $listId = null, $source = null)
     {
-        $userId = $this->id;
-        $callback = function ($select) use ($userId, $resourceId, $listId, $source) {
-            $select->columns(
-                [
-                    'id' => new Expression(
-                        'min(?)', ['tags.id'],
-                        [Expression::TYPE_IDENTIFIER]
-                    ),
-                    'tag',
-                    'cnt' => new Expression(
-                        'COUNT(DISTINCT(?))', ['rt.resource_id'],
-                        [Expression::TYPE_IDENTIFIER]
-                    )
-                ]
-            );
-            $select->join(
-                ['rt' => 'resource_tags'], 'tags.id = rt.tag_id', []
-            );
-            $select->join(
-                ['r' => 'resource'], 'rt.resource_id = r.id', []
-            );
-            $select->join(
-                ['ur' => 'user_resource'], 'r.id = ur.resource_id', []
-            );
-            $select->group(['tag'])
-                ->order(['tag']);
+        return $this->getDbTable('Tags')
+            ->getForUser($this->id, $resourceId, $listId, $source);
+    }
 
-            $select->where->equalTo('ur.user_id', $userId)
-                ->equalTo('rt.user_id', $userId)
-                ->equalTo(
-                    'ur.list_id', 'rt.list_id',
-                    Predicate::TYPE_IDENTIFIER, Predicate::TYPE_IDENTIFIER
-                )
-                ->equalTo('r.source', $source);
-
-            if (!is_null($resourceId)) {
-                $select->where->equalTo('r.record_id', $resourceId);
-            }
-            if (!is_null($listId)) {
-                $select->where->equalTo('rt.list_id', $listId);
-            }
-        };
-
-        $table = $this->getDbTable('Tags');
-        return $table->select($callback);
+    /**
+     * Get tags assigned by the user to a favorite list.
+     *
+     * @param int $listId List id
+     *
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
+     */
+    public function getListTags($listId)
+    {
+        return $this->getDbTable('Tags')
+            ->getForList($listId, $this->id);
     }
 
     /**
@@ -280,21 +295,32 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
      * for no filter).
      * @param int    $listId     Filter for tags tied to a specific list (null for no
      * filter).
-     * @param string $source     Filter for tags tied to a specific record source.
+     * @param string $source     Filter for tags tied to a specific record source
+     * (null for no filter).
      *
      * @return string
      */
-    public function getTagString($resourceId = null, $listId = null,
-        $source = 'VuFind'
-    ) {
-        $myTagList = $this->getTags($resourceId, $listId, $source);
+    public function getTagString($resourceId = null, $listId = null, $source = null)
+    {
+        return $this->formatTagString($this->getTags($resourceId, $listId, $source));
+    }
+
+    /**
+     * Same as getTagString(), but operates on a list of tags.
+     *
+     * @param array $tags Tags
+     *
+     * @return string
+     */
+    public function formatTagString($tags)
+    {
         $tagStr = '';
-        if (count($myTagList) > 0) {
-            foreach ($myTagList as $myTag) {
-                if (strstr($myTag->tag, ' ')) {
-                    $tagStr .= "\"$myTag->tag\" ";
+        if (count($tags) > 0) {
+            foreach ($tags as $tag) {
+                if (strstr($tag->tag, ' ')) {
+                    $tagStr .= "\"$tag->tag\" ";
                 } else {
-                    $tagStr .= "$myTag->tag ";
+                    $tagStr .= "$tag->tag ";
                 }
             }
         }
@@ -304,7 +330,7 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     /**
      * Get all of the lists associated with this user.
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
     public function getLists()
     {
@@ -347,8 +373,9 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
      *
      * @return array
      */
-    public function getSavedData($resourceId, $listId = null, $source = 'VuFind')
-    {
+    public function getSavedData($resourceId, $listId = null,
+        $source = DEFAULT_SEARCH_BACKEND
+    ) {
         $table = $this->getDbTable('UserResource');
         return $table->getSavedData($resourceId, $source, $listId, $this->id);
     }
@@ -395,7 +422,7 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
      *
      * @return void
      */
-    public function removeResourcesById($ids, $source = 'VuFind')
+    public function removeResourcesById($ids, $source = DEFAULT_SEARCH_BACKEND)
     {
         // Retrieve a list of resource IDs:
         $resourceTable = $this->getDbTable('Resource');
@@ -409,13 +436,13 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
         // Remove Resource (related tags are also removed implicitly)
         $userResourceTable = $this->getDbTable('UserResource');
         // true here makes sure that only tags in lists are deleted
-        $userResourceTable->destroyLinks($resourceIDs, $this->id, true);
+        $userResourceTable->destroyResourceLinks($resourceIDs, $this->id, true);
     }
 
     /**
      * Whether library cards are enabled
      *
-     * @return boolean
+     * @return bool
      */
     public function libraryCardsEnabled()
     {
@@ -426,13 +453,13 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     /**
      * Get all library cards associated with the user.
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      * @throws \VuFind\Exception\LibraryCard
      */
     public function getLibraryCards()
     {
         if (!$this->libraryCardsEnabled()) {
-            return new \Zend\Db\ResultSet\ResultSet();
+            return new \Laminas\Db\ResultSet\ResultSet();
         }
         $userCard = $this->getDbTable('UserCard');
         return $userCard->select(['user_id' => $this->id]);
@@ -591,9 +618,11 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
 
         $row->save();
 
-        // If this is the first library card or no credentials are currently set,
-        // activate the card now
-        if ($this->getLibraryCards()->count() == 1 || empty($this->cat_username)) {
+        // If this is the first or active library card, or no credentials are
+        // currently set, activate the card now
+        if ($this->getLibraryCards()->count() == 1 || empty($this->cat_username)
+            || $this->cat_username === $row->cat_username
+        ) {
             $this->activateLibraryCard($row->id);
         }
 
@@ -635,9 +664,11 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     /**
      * Destroy the user.
      *
+     * @param bool $removeComments Whether to remove user's comments
+     *
      * @return int The number of rows deleted.
      */
-    public function delete()
+    public function delete($removeComments = true)
     {
         // Remove all lists owned by the user:
         $lists = $this->getLists();
@@ -647,6 +678,12 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
             // a new object for each row in order to perform a delete operation:
             $list = $table->getExisting($current->id);
             $list->delete($this, true);
+        }
+        $resourceTags = $this->getDbTable('ResourceTags');
+        $resourceTags->destroyResourceLinks(null, $this->id);
+        if ($removeComments) {
+            $comments = $this->getDbTable('Comments');
+            $comments->deleteByUser($this);
         }
 
         // Remove the user itself:
@@ -662,9 +699,44 @@ class User extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface,
     {
         $hash = md5($this->username . $this->password . $this->pass_hash . rand());
         // Make totally sure the timestamp is exactly 10 characters:
-        $time = str_pad(substr((string) time(), 0, 10), 10, '0', STR_PAD_LEFT);
+        $time = str_pad(substr((string)time(), 0, 10), 10, '0', STR_PAD_LEFT);
         $this->verify_hash = $hash . $time;
         return $this->save();
+    }
+
+    /**
+     * Updated saved language
+     *
+     * @param string $language New language
+     *
+     * @return void
+     */
+    public function updateLastLanguage($language)
+    {
+        $this->last_language = $language;
+        $this->save();
+    }
+
+    /**
+     * Update the user's email address, if appropriate. Note that this does NOT
+     * automatically save the row; it assumes a subsequent call will be made to
+     * the save() method.
+     *
+     * @param string $email        New email address
+     * @param bool   $userProvided Was this email provided by the user (true) or
+     * an automated lookup (false)?
+     *
+     * @return void
+     */
+    public function updateEmail($email, $userProvided = false)
+    {
+        // Only change the email if it is a non-empty value and was user provided
+        // (the user is always right) or the previous email was NOT user provided
+        // (a value may have changed in an upstream system).
+        if (!empty($email) && ($userProvided || !$this->user_provided_email)) {
+            $this->email = $email;
+            $this->user_provided_email = $userProvided ? 1 : 0;
+        }
     }
 
     /**

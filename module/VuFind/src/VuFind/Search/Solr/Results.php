@@ -2,7 +2,7 @@
 /**
  * Solr aspect of the Search Multi-class (Results)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,15 +17,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Solr
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\Solr;
+
 use VuFindSearch\Backend\Solr\Response\Json\Spellcheck;
 use VuFindSearch\Query\AbstractQuery;
 use VuFindSearch\Query\QueryGroup;
@@ -33,12 +34,12 @@ use VuFindSearch\Query\QueryGroup;
 /**
  * Solr Search Parameters
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Solr
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Results extends \VuFind\Search\Base\Results
 {
@@ -50,7 +51,7 @@ class Results extends \VuFind\Search\Base\Results
     protected $responseFacets = null;
 
     /**
-     * Search backend identifiers.
+     * Search backend identifier.
      *
      * @var string
      */
@@ -69,6 +70,34 @@ class Results extends \VuFind\Search\Base\Results
      * @var SpellingProcessor
      */
     protected $spellingProcessor = null;
+
+    /**
+     * CursorMark used for deep paging (e.g. OAI-PMH Server).
+     * Set to '*' to start paging a request and use the new value returned from the
+     * search request for the next request.
+     *
+     * @var null|string
+     */
+    protected $cursorMark = null;
+
+    /**
+     * Hierarchical facet helper
+     *
+     * @var HierarchicalFacetHelper
+     */
+    protected $hierarchicalFacetHelper = null;
+
+    /**
+     * Set hierarchical facet helper
+     *
+     * @param HierarchicalFacetHelper $helper Hierarchical facet helper
+     *
+     * @return void
+     */
+    public function setHierarchicalFacetHelper(HierarchicalFacetHelper $helper)
+    {
+        $this->hierarchicalFacetHelper = $helper;
+    }
 
     /**
      * Get spelling processor.
@@ -96,6 +125,28 @@ class Results extends \VuFind\Search\Base\Results
     }
 
     /**
+     * Get cursorMark.
+     *
+     * @return null|string
+     */
+    public function getCursorMark()
+    {
+        return $this->cursorMark;
+    }
+
+    /**
+     * Set cursorMark.
+     *
+     * @param null|string $cursorMark New cursor mark
+     *
+     * @return void
+     */
+    public function setCursorMark($cursorMark)
+    {
+        $this->cursorMark = $cursorMark;
+    }
+
+    /**
      * Support method for performAndProcessSearch -- perform a search based on the
      * parameters passed to the object.
      *
@@ -108,6 +159,13 @@ class Results extends \VuFind\Search\Base\Results
         $offset = $this->getStartRecord() - 1;
         $params = $this->getParams()->getBackendParameters();
         $searchService = $this->getSearchService();
+        $cursorMark = $this->getCursorMark();
+        if (null !== $cursorMark) {
+            $params->set('cursorMark', '' === $cursorMark ? '*' : $cursorMark);
+            // Override any default timeAllowed since it cannot be used with
+            // cursorMark
+            $params->set('timeAllowed', -1);
+        }
 
         try {
             $collection = $searchService
@@ -135,6 +193,11 @@ class Results extends \VuFind\Search\Base\Results
         $this->spellingQuery = $spellcheck->getQuery();
         $this->suggestions = $this->getSpellingProcessor()
             ->getSuggestions($spellcheck, $this->getParams()->getQuery());
+
+        // Update current cursorMark
+        if (null !== $cursorMark) {
+            $this->setCursorMark($collection->getCursorMark());
+        }
 
         // Construct record drivers for all the items in the response:
         $this->results = $collection->getRecords();
@@ -231,7 +294,7 @@ class Results extends \VuFind\Search\Base\Results
         }
 
         // If there is no filter, we'll use all facets as the filter:
-        if (is_null($filter)) {
+        if (null === $filter) {
             $filter = $this->getParams()->getFacetConfig();
         }
 
@@ -241,8 +304,9 @@ class Results extends \VuFind\Search\Base\Results
         // Loop through every field returned by the result set
         $fieldFacets = $this->responseFacets->getFieldFacets();
         $translatedFacets = $this->getOptions()->getTranslatedFacets();
+        $hierarchicalFacets = $this->getOptions()->getHierarchicalFacets();
         foreach (array_keys($filter) as $field) {
-            $data = isset($fieldFacets[$field]) ? $fieldFacets[$field] : [];
+            $data = $fieldFacets[$field] ?? [];
             // Skip empty arrays:
             if (count($data) < 1) {
                 continue;
@@ -258,14 +322,30 @@ class Results extends \VuFind\Search\Base\Results
                 $translateTextDomain = $this->getOptions()
                     ->getTextDomainForTranslatedFacet($field);
             }
+            $hierarchical = in_array($field, $hierarchicalFacets);
             // Loop through values:
             foreach ($data as $value => $count) {
                 // Initialize the array of data about the current facet:
                 $currentSettings = [];
                 $currentSettings['value'] = $value;
-                $currentSettings['displayText']
-                    = $translate
-                    ? $this->translate("$translateTextDomain::$value") : $value;
+
+                $displayText = $this->getParams()
+                    ->checkForDelimitedFacetDisplayText($field, $value);
+
+                if ($hierarchical) {
+                    if (!$this->hierarchicalFacetHelper) {
+                        throw new \Exception(
+                            get_class($this)
+                            . ': hierarchical facet helper unavailable'
+                        );
+                    }
+                    $displayText = $this->hierarchicalFacetHelper
+                        ->formatDisplayText($displayText);
+                }
+                $currentSettings['displayText'] = $translate
+                    ? $this->translate([$translateTextDomain, $displayText])
+                    : $displayText;
+
                 $currentSettings['count'] = $count;
                 $currentSettings['operator']
                     = $this->getParams()->getFacetOperator($field);
@@ -290,23 +370,33 @@ class Results extends \VuFind\Search\Base\Results
      * may be useful for very large amounts of facets that can break the JSON parse
      * method because of PHP out of memory exceptions (default = -1, no limit).
      * @param string $facetSort    A facet sort value to use (null to retain current)
+     * @param int    $page         1 based. Offsets results by limit.
+     * @param bool   $ored         Whether or not facet is an OR facet or not
      *
-     * @return array an array with the facet values for each index field
+     * @return array list facet values for each index field with label and more bool
      */
-    public function getFullFieldFacets($facetfields, $removeFilter = true,
-        $limit = -1, $facetSort = null
+    public function getPartialFieldFacets($facetfields, $removeFilter = true,
+        $limit = -1, $facetSort = null, $page = null, $ored = false
     ) {
-        $clone = clone($this);
+        $clone = clone $this;
         $params = $clone->getParams();
 
         // Manipulate facet settings temporarily:
         $params->resetFacetConfig();
         $params->setFacetLimit($limit);
+        // Clear field-specific limits, as they can interfere with retrieval:
+        $params->setFacetLimitByField([]);
+        if (null !== $page && $limit != -1) {
+            $offset = ($page - 1) * $limit;
+            $params->setFacetOffset($offset);
+            // Return limit plus one so we know there's another page
+            $params->setFacetLimit($limit + 1);
+        }
         if (null !== $facetSort) {
             $params->setFacetSort($facetSort);
         }
         foreach ($facetfields as $facetName) {
-            $params->addFacet($facetName);
+            $params->addFacet($facetName, null, $ored);
 
             // Clear existing filters for the selected field if necessary:
             if ($removeFilter) {
@@ -331,8 +421,15 @@ class Results extends \VuFind\Search\Base\Results
 
         // Reformat into a hash:
         foreach ($result as $key => $value) {
-            unset($result[$key]);
-            $result[$key]['data'] = $value;
+            // Detect next page and crop results if necessary
+            $more = false;
+            if (isset($page) && count($value['list']) > 0
+                && count($value['list']) == $limit + 1
+            ) {
+                $more = true;
+                array_pop($value['list']);
+            }
+            $result[$key] = ['more' => $more, 'data' => $value];
         }
 
         // Send back data:

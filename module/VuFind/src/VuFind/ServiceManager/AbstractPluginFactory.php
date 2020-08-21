@@ -2,7 +2,7 @@
 /**
  * VuFind Abstract Plugin Factory
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ServiceManager
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\ServiceManager;
-use Zend\ServiceManager\AbstractFactoryInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
+
+use Interop\Container\ContainerInterface;
+use Laminas\ServiceManager\Factory\AbstractFactoryInterface;
 
 /**
  * VuFind Abstract Plugin Factory
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ServiceManager
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 abstract class AbstractPluginFactory implements AbstractFactoryInterface
 {
@@ -57,12 +58,11 @@ abstract class AbstractPluginFactory implements AbstractFactoryInterface
     /**
      * Get the name of a class for a given plugin name.
      *
-     * @param string $name          Name of service
-     * @param string $requestedName Unfiltered name of service
+     * @param string $requestedName Name of service
      *
      * @return string               Fully qualified class name
      */
-    protected function getClassName($name, $requestedName)
+    protected function getClassName($requestedName)
     {
         // If we have a FQCN that refers to an existing class, return it as-is:
         if (strpos($requestedName, '\\') !== false && class_exists($requestedName)) {
@@ -72,8 +72,8 @@ abstract class AbstractPluginFactory implements AbstractFactoryInterface
         $finalName = $this->defaultNamespace . '\\' . $requestedName
             . $this->classSuffix;
         if (!class_exists($finalName)) {
-            $finalName = $this->defaultNamespace . '\\' . ucwords(strtolower($name))
-                . $this->classSuffix;
+            $finalName = $this->defaultNamespace . '\\'
+                . ucwords(strtolower($requestedName)) . $this->classSuffix;
         }
         return $finalName;
     }
@@ -81,36 +81,33 @@ abstract class AbstractPluginFactory implements AbstractFactoryInterface
     /**
      * Can we create a service for the specified name?
      *
-     * @param ServiceLocatorInterface $serviceLocator Service locator
-     * @param string                  $name           Name of service
-     * @param string                  $requestedName  Unfiltered name of service
+     * @param ContainerInterface $container     Service container
+     * @param string             $requestedName Name of service
      *
      * @return bool
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function canCreateServiceWithName(ServiceLocatorInterface $serviceLocator,
-        $name, $requestedName
-    ) {
-        $className = $this->getClassName($name, $requestedName);
-        return class_exists($className);
+    public function canCreate(ContainerInterface $container, $requestedName)
+    {
+        return class_exists($this->getClassName($requestedName));
     }
 
     /**
      * Create a service for the specified name.
      *
-     * @param ServiceLocatorInterface $serviceLocator Service locator
-     * @param string                  $name           Name of service
-     * @param string                  $requestedName  Unfiltered name of service
+     * @param ContainerInterface $container     Service container
+     * @param string             $requestedName Name of service
+     * @param array              $options       Options (unused)
      *
      * @return object
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function createServiceWithName(ServiceLocatorInterface $serviceLocator,
-        $name, $requestedName
+    public function __invoke(ContainerInterface $container, $requestedName,
+        array $options = null
     ) {
-        $class = $this->getClassName($name, $requestedName);
+        $class = $this->getClassName($requestedName);
         return new $class();
     }
 }

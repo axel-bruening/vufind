@@ -2,7 +2,7 @@
 /**
  * Row Definition for user_list
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,39 +17,59 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Row
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Db\Row;
-use VuFind\Exception\ListPermission as ListPermissionException,
-    VuFind\Exception\MissingField as MissingFieldException,
-    Zend\Session\Container as SessionContainer;
+
+use Laminas\Session\Container;
+use VuFind\Exception\ListPermission as ListPermissionException;
+use VuFind\Exception\MissingField as MissingFieldException;
+use VuFind\Tags;
 
 /**
  * Row Definition for user_list
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Row
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterface
 {
     use \VuFind\Db\Table\DbTableAwareTrait;
 
     /**
+     * Session container for last list information.
+     *
+     * @var Container
+     */
+    protected $session = null;
+
+    /**
+     * Tag parser.
+     *
+     * @var Tags
+     */
+    protected $tagParser;
+
+    /**
      * Constructor
      *
-     * @param \Zend\Db\Adapter\Adapter $adapter Database adapter
+     * @param \Laminas\Db\Adapter\Adapter $adapter   Database adapter
+     * @param Tags                        $tagParser Tag parser
+     * @param Container                   $session   Session container
      */
-    public function __construct($adapter)
+    public function __construct($adapter, Tags $tagParser, Container $session = null)
     {
+        $this->tagParser = $tagParser;
+        $this->session = $session;
         parent::__construct('id', 'user_list', $adapter);
     }
 
@@ -69,11 +89,11 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
     }
 
     /**
-     * Get an array of tags associated with this list.
+     * Get an array of resource tags associated with this list.
      *
      * @return array
      */
-    public function getTags()
+    public function getResourceTags()
     {
         $table = $this->getDbTable('User');
         $user = $table->select(['id' => $this->user_id])->current();
@@ -84,11 +104,38 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
     }
 
     /**
+     * Get an array of resource tags associated with this list.
+     *
+     * @deprecated Deprecated, use getResourceTags.
+     *
+     * @return array
+     */
+    public function getTags()
+    {
+        return $this->getResourceTags();
+    }
+
+    /**
+     * Get an array of tags assigned to this list.
+     *
+     * @return array
+     */
+    public function getListTags()
+    {
+        $table = $this->getDbTable('User');
+        $user = $table->select(['id' => $this->user_id])->current();
+        if (empty($user)) {
+            return [];
+        }
+        return $user->getListTags($this->id, $this->user_id);
+    }
+
+    /**
      * Update and save the list object using a request object -- useful for
      * sharing form processing between multiple actions.
      *
-     * @param \VuFind\Db\Row\User|bool $user    Logged-in user (false if none)
-     * @param \Zend\Stdlib\Parameters  $request Request to process
+     * @param \VuFind\Db\Row\User|bool   $user    Logged-in user (false if none)
+     * @param \Laminas\Stdlib\Parameters $request Request to process
      *
      * @return int ID of newly created row
      * @throws ListPermissionException
@@ -100,7 +147,37 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
         $this->description = $request->get('desc');
         $this->public = $request->get('public');
         $this->save($user);
+
+        if (null !== ($tags = $request->get('tags'))) {
+            $linker = $this->getDbTable('resourcetags');
+            $linker->destroyListLinks($this->id, $user->id);
+            foreach ($this->tagParser->parse($tags) as $tag) {
+                $this->addListTag($tag, $user);
+            }
+        }
+
         return $this->id;
+    }
+
+    /**
+     * Add a tag to the list.
+     *
+     * @param string              $tagText The tag to save.
+     * @param \VuFind\Db\Row\User $user    The user posting the tag.
+     *
+     * @return void
+     */
+    public function addListTag($tagText, $user)
+    {
+        $tagText = trim($tagText);
+        if (!empty($tagText)) {
+            $tags = $this->getDbTable('tags');
+            $tag = $tags->getByText($tagText);
+            $linker = $this->getDbTable('resourcetags');
+            $linker->createLink(
+                null, $tag->id, $user->id, $this->id
+            );
+        }
     }
 
     /**
@@ -131,6 +208,18 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
     }
 
     /**
+     * Set session container
+     *
+     * @param Container $session Session container
+     *
+     * @return void
+     */
+    public function setSession(Container $session)
+    {
+        $this->session = $session;
+    }
+
+    /**
      * Remember that this list was used so that it can become the default in
      * dialog boxes.
      *
@@ -138,19 +227,9 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
      */
     public function rememberLastUsed()
     {
-        $session = new SessionContainer('List');
-        $session->lastUsed = $this->id;
-    }
-
-    /**
-     * Retrieve the ID of the last list that was accessed, if any.
-     *
-     * @return mixed User_list ID (if set) or null (if not available).
-     */
-    public static function getLastUsed()
-    {
-        $session = new SessionContainer('List');
-        return isset($session->lastUsed) ? $session->lastUsed : null;
+        if (null !== $this->session) {
+            $this->session->lastUsed = $this->id;
+        }
     }
 
     /**
@@ -162,8 +241,9 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
      *
      * @return void
      */
-    public function removeResourcesById($user, $ids, $source = 'VuFind')
-    {
+    public function removeResourcesById($user, $ids,
+        $source = DEFAULT_SEARCH_BACKEND
+    ) {
         if (!$this->editAllowed($user)) {
             throw new ListPermissionException('list_access_denied');
         }
@@ -179,7 +259,9 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
 
         // Remove Resource (related tags are also removed implicitly)
         $userResourceTable = $this->getDbTable('UserResource');
-        $userResourceTable->destroyLinks($resourceIDs, $this->user_id, $this->id);
+        $userResourceTable->destroyResourceLinks(
+            $resourceIDs, $this->user_id, $this->id
+        );
     }
 
     /**
@@ -210,6 +292,10 @@ class UserList extends RowGateway implements \VuFind\Db\Table\DbTableAwareInterf
         // Remove user_resource and resource_tags rows:
         $userResource = $this->getDbTable('UserResource');
         $userResource->destroyLinks(null, $this->user_id, $this->id);
+
+        // Remove resource_tags rows for list tags:
+        $linker = $this->getDbTable('resourcetags');
+        $linker->destroyListLinks($this->id, $user->id);
 
         // Remove the list itself:
         return parent::delete();

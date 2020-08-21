@@ -1,6 +1,6 @@
-<?
+<?php
 // A driver-specific template may pass in format overrides; check for these before going to the driver itself:
-$formats = isset($this->overrideFormats) ? $this->overrideFormats : $this->driver->tryMethod('getFormats');
+$formats = $this->slot('endnote-formats')->get($this->driver->tryMethod('getFormats'));
 if (is_array($formats) && !empty($formats)) {
     foreach ($formats as $format) {
         echo "%0 $format\n";
@@ -43,7 +43,7 @@ if (is_array($pubPlaces) && is_array($pubDates) && is_array($pubNames)) {
             echo "%D $date\n";
         }
         if (isset($pubPlaces[$i])) {
-            echo "%C " . rtrim(str_replace(array('[', ']'), '', $pubPlaces[$i]), ': '). "\n";
+            echo "%C " . rtrim(str_replace(['[', ']'], '', $pubPlaces[$i]), ': ') . "\n";
         }
     }
 }

@@ -1,22 +1,26 @@
-<?
+<?php
 // A driver-specific template may pass in format overrides; check for these before going to the driver itself:
-$formats = isset($this->overrideFormats) ? $this->overrideFormats : $this->driver->tryMethod('getFormats');
+$formats = $this->slot('endnoteweb-formats')->get($this->driver->tryMethod('getFormats'));
 if (is_array($formats)) {
     foreach ($formats as $format) {
         switch (strtolower($format)) {
-            case "book";
+            case "book":
                 $format = "BOOK";
                 break;
             case "journal":
             case "article":
+            case "journal article":
                 $format = "JOUR";
                 break;
             case "thesis":
+            case "dissertation":
                 $format = "THES";
                 break;
+            case "book chapter":
+            case "conference proceeding":
+                // TODO: Find better codes for these; for now they'll drop through to "generic."
             default:
                 $format = "GEN";
-                break;
         }
 
         echo "TY  - $format\n";
@@ -84,7 +88,7 @@ if (is_array($pubPlaces) && is_array($pubDates) && is_array($pubNames)) {
     }
     for ($i = 0; $i < $total; $i++) {
         if (isset($pubPlaces[$i])) {
-            echo "PP  - " . rtrim(str_replace(array('[', ']'), '', $pubPlaces[$i]), ': '). "\n";
+            echo "PP  - " . rtrim(str_replace(['[', ']'], '', $pubPlaces[$i]), ': ') . "\n";
         }
         if (isset($pubNames[$i])) {
             echo "PB  - " . rtrim($pubNames[$i], ", ") . "\n";

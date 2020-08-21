@@ -2,7 +2,7 @@
 /**
  * EBSCO Search Results
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,14 +17,14 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_EBSCO
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\EIT;
 
@@ -33,15 +33,22 @@ namespace VuFind\Search\EIT;
  * Partially copied from WorldCat Search Parameters; partially copied from other
  * pieces of VuFind code
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_EBSCO
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Results extends \VuFind\Search\Base\Results
 {
+    /**
+     * Search backend identifier.
+     *
+     * @var string
+     */
+    protected $backendId = 'EIT';
+
     /**
      * Support method for performAndProcessSearch -- perform a search based on the
      * parameters passed to the object.
@@ -55,7 +62,7 @@ class Results extends \VuFind\Search\Base\Results
         $offset = $this->getStartRecord() - 1;
         $params = $this->getParams()->getBackendParameters();
         $collection = $this->getSearchService()
-            ->search('EIT', $query, $offset, $limit, $params);
+            ->search($this->backendId, $query, $offset, $limit, $params);
 
         $this->resultTotal = $collection->getTotal();
         $this->results = $collection->getRecords();

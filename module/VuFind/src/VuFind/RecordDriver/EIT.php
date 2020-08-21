@@ -2,7 +2,7 @@
 /**
  * Model for records retrieved via EBSCO's EIT API.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Julia Bauder 2013.
  *
@@ -17,26 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordDrivers
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\RecordDriver;
 
 /**
  * Model for records retrieved via EBSCO's EIT API.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordDrivers
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
-class EIT extends SolrDefault
+class EIT extends DefaultRecord
 {
     /**
      * Used for identifying search backends
@@ -66,7 +66,7 @@ class EIT extends SolrDefault
     public function setRawData($data)
     {
         // Easy way to recursively convert a SimpleXML Object to an array
-        $data = json_decode(json_encode((array) $data), 1);
+        $data = json_decode(json_encode((array)$data), 1);
         if (isset($data['fields'])) {
             $this->fields = $data['fields'];
         } else {
@@ -83,9 +83,15 @@ class EIT extends SolrDefault
      * returned as an array of chunks, increasing from least specific to most
      * specific.
      *
+     * @param bool $extended Whether to return a keyed array with the following
+     * keys:
+     * - heading: the actual subject heading chunks
+     * - type: heading type
+     * - source: source vocabulary
+     *
      * @return array
      */
-    public function getAllSubjectHeadings()
+    public function getAllSubjectHeadings($extended = false)
     {
         $su = isset($this->controlInfo['artinfo']['su'])
             ? $this->controlInfo['artinfo']['su'] : [];
@@ -94,7 +100,9 @@ class EIT extends SolrDefault
         // format, so we'll just send each value as a single chunk.
         $retval = [];
         foreach ($su as $s) {
-            $retval[] = [$s];
+            $retval[] = $extended
+                ? ['heading' => [$s], 'type' => '', 'source' => '']
+                : [$s];
         }
         return $retval;
     }
@@ -142,7 +150,7 @@ class EIT extends SolrDefault
             $this->controlInfo['jinfo']['issn'] : false;
     }
 
-        /**
+    /**
      * Get the date coverage for a record which spans a period of time (i.e. a
      * journal).  Use getPublicationDates for publication dates of particular
      * monographic items.
@@ -152,31 +160,6 @@ class EIT extends SolrDefault
     public function getDateSpan()
     {
         return [];
-    }
-
-    /**
-     * Deduplicate author information into associative array with main/corporate/
-     * secondary keys.
-     *
-     * @return array
-     */
-    public function getDeduplicatedAuthors()
-    {
-        $authors = [
-            'main' => $this->getPrimaryAuthor(),
-            'secondary' => $this->getSecondaryAuthors()
-        ];
-
-        // The secondary author array may contain a corporate or primary author;
-        // let's be sure we filter out duplicate values.
-        $duplicates = [];
-        if (!empty($authors['main'])) {
-            $duplicates[] = $authors['main'];
-        }
-        if (!empty($duplicates)) {
-            $authors['secondary'] = array_diff($authors['secondary'], $duplicates);
-        }
-        return $authors;
     }
 
     /**
@@ -210,17 +193,16 @@ class EIT extends SolrDefault
      *
      * @return string
      */
-    public function getPrimaryAuthor()
+    public function getPrimaryAuthors()
     {
         if (isset($this->controlInfo['artinfo']['aug']['au'])
             && is_array($this->controlInfo['artinfo']['aug']['au'])
         ) {
-            return $this->controlInfo['artinfo']['aug']['au']['0'];
+            return $this->controlInfo['artinfo']['aug']['au'];
         } else {
             return isset($this->controlInfo['artinfo']['aug']['au'])
-                ? $this->controlInfo['artinfo']['aug']['au'] : '';
+                ? [$this->controlInfo['artinfo']['aug']['au']] : [];
         }
-
     }
 
     /**
@@ -234,7 +216,7 @@ class EIT extends SolrDefault
             return [
                 $this->controlInfo['pubinfo']['dt']['@attributes']['year']
             ];
-        } else if (isset($this->controlInfo['pubinfo']['dt'])) {
+        } elseif (isset($this->controlInfo['pubinfo']['dt'])) {
             return [$this->controlInfo['pubinfo']['dt']];
         } else {
             return [];
@@ -253,17 +235,6 @@ class EIT extends SolrDefault
     }
 
     /**
-     * Get an array of all secondary authors (complementing getPrimaryAuthor()).
-     *
-     * @return array
-     */
-    public function getSecondaryAuthors()
-    {
-        return is_array($this->controlInfo['artinfo']['aug']['au'])
-            ? $this->controlInfo['artinfo']['aug']['au'] : [];
-    }
-
-    /**
      * Get the short (pre-subtitle) title of the record.
      *
      * @return string
@@ -274,7 +245,7 @@ class EIT extends SolrDefault
             ? $this->controlInfo['artinfo']['tig']['atl'] : '';
     }
 
-        /**
+    /**
      * Get an array of summary strings for the record.
      *
      * @return array
@@ -297,7 +268,7 @@ class EIT extends SolrDefault
         return [];
     }
 
-        /**
+    /**
      * Get the full title of the record.
      *
      * @return string
@@ -308,7 +279,7 @@ class EIT extends SolrDefault
             ? $this->controlInfo['artinfo']['tig']['atl'] : '';
     }
 
-        /**
+    /**
      * Return an array of associative URL arrays with one or more of the following
      * keys:
      *
@@ -355,7 +326,7 @@ class EIT extends SolrDefault
         return $this->fields['fields']['header']['@attributes']['uiTerm'];
     }
 
-        /**
+    /**
      * Get the title of the item that contains this record (i.e. MARC 773s of a
      * journal).
      *
@@ -425,13 +396,13 @@ class EIT extends SolrDefault
         $pagecount = $this->getContainerPageCount();
         $endpage = $startpage + $pagecount;
         if ($endpage != 0) {
-                return $endpage;
+            return $endpage;
         } else {
             return null;
         }
     }
 
-        /**
+    /**
      * Get a sortable title for the record (i.e. no leading articles).
      *
      * @return string
@@ -454,9 +425,9 @@ class EIT extends SolrDefault
         $formats = $this->getFormats();
         if (in_array('Book', $formats)) {
             return 'Book';
-        } else if (in_array('Article', $formats)) {
+        } elseif (in_array('Article', $formats)) {
             return 'Article';
-        } else if (in_array('Journal', $formats)) {
+        } elseif (in_array('Journal', $formats)) {
             return 'Journal';
         }
         // Defaulting to "Article" because many EBSCO databases have things like

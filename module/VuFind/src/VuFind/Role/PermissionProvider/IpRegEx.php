@@ -2,7 +2,7 @@
 /**
  * IpRegEx permission provider for VuFind.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -17,25 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authorization
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Role\PermissionProvider;
-use Zend\Http\PhpEnvironment\Request;
+
+use Laminas\Http\PhpEnvironment\Request;
+use VuFind\Net\UserIpReader;
 
 /**
  * IpRegEx permission provider for VuFind.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authorization
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class IpRegEx implements PermissionProviderInterface
 {
@@ -47,13 +49,22 @@ class IpRegEx implements PermissionProviderInterface
     protected $request;
 
     /**
+     * User IP address reader
+     *
+     * @var UserIpReader
+     */
+    protected $userIpReader;
+
+    /**
      * Constructor
      *
-     * @param Request $request Request object
+     * @param Request      $request      Request object
+     * @param UserIpReader $userIpReader User IP address reader
      */
-    public function __construct(Request $request)
+    public function __construct(Request $request, UserIpReader $userIpReader = null)
     {
         $this->request = $request;
+        $this->userIpReader = $userIpReader;
     }
 
     /**
@@ -67,9 +78,15 @@ class IpRegEx implements PermissionProviderInterface
     public function getPermissions($options)
     {
         // Check if any regex matches....
-        $ip = $this->request->getServer()->get('REMOTE_ADDR');
+        if ($this->userIpReader !== null) {
+            $ipAddr = $this->userIpReader->getUserIp();
+        } elseif (PHP_SAPI == 'cli') {
+            $ipAddr = null;
+        } else {
+            $ipAddr = $this->request->getServer()->get('REMOTE_ADDR');
+        }
         foreach ((array)$options as $current) {
-            if (preg_match($current, $ip)) {
+            if (preg_match($current, $ipAddr)) {
                 // Match? Grant to all users (guest or logged in).
                 return ['guest', 'loggedin'];
             }

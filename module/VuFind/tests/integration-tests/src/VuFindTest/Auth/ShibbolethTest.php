@@ -2,7 +2,7 @@
 /**
  * Shibboleth authentication test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,25 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Auth;
-use VuFind\Auth\Shibboleth, VuFind\Db\Table\User, Zend\Config\Config;
+
+use Laminas\Config\Config;
+use VuFind\Auth\Shibboleth;
 
 /**
  * Shibboleth authentication test class.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
 {
@@ -44,11 +46,11 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
     /**
      * Standard setup method.
      *
-     * @return mixed
+     * @return void
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
-        return static::failIfUsersExist();
+        static::failIfUsersExist();
     }
 
     /**
@@ -56,11 +58,12 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
         // Give up if we're not running in CI:
         if (!$this->continuousIntegrationRunning()) {
-            return $this->markTestSkipped('Continuous integration not running.');
+            $this->markTestSkipped('Continuous integration not running.');
+            return;
         }
     }
 
@@ -76,7 +79,9 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
         if (null === $config) {
             $config = $this->getAuthConfig();
         }
-        $obj = clone($this->getAuthManager()->get('Shibboleth'));
+        $obj = new Shibboleth($this->createMock(\Laminas\Session\ManagerInterface::class));
+        $initializer = new \VuFind\ServiceManager\ServiceInitializer();
+        $initializer($this->getServiceManager(), $obj);
         $obj->setConfig($config);
         return $obj;
     }
@@ -116,7 +121,7 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      *
      * @param array $overrides Associative array of parameters to override.
      *
-     * @return \Zend\Http\Request
+     * @return \Laminas\Http\Request
      */
     protected function getLoginRequest($overrides = [])
     {
@@ -124,8 +129,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
             'username' => 'testuser', 'email' => 'user@test.com',
             'password' => 'testpass'
         ];
-        $request = new \Zend\Http\PhpEnvironment\Request();
-        $request->setServer(new \Zend\Stdlib\Parameters($server));
+        $request = new \Laminas\Http\PhpEnvironment\Request();
+        $request->setServer(new \Laminas\Stdlib\Parameters($server));
         return $request;
     }
 
@@ -136,7 +141,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['username' => '']);
         $this->getAuthObject()->authenticate($request);
     }
@@ -148,7 +154,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankPassword()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['password' => '']);
         $this->getAuthObject()->authenticate($request);
     }
@@ -160,7 +167,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testWithMissingAttributeValue()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $config = $this->getAuthConfig();
         unset($config->Shibboleth->userattribute_value_1);
         $this->getAuthObject($config)->authenticate($this->getLoginRequest());
@@ -173,7 +181,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testWithoutUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $config = $this->getAuthConfig();
         unset($config->Shibboleth->username);
         $this->getAuthObject($config)->authenticate($this->getLoginRequest());
@@ -186,7 +195,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testWithoutLoginSetting()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $config = $this->getAuthConfig();
         unset($config->Shibboleth->login);
         $this->getAuthObject($config)->getSessionInitiator('http://target');
@@ -222,8 +232,8 @@ class ShibbolethTest extends \VuFindTest\Unit\DbTestCase
      *
      * @return void
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
-         static::removeUsers('testuser');
-   }
+        static::removeUsers('testuser');
+    }
 }

@@ -2,7 +2,7 @@
 /**
  * Hierarchy interface.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,17 +17,18 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Hierarchy
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 namespace VuFind\Hierarchy\Driver;
-use VuFind\Hierarchy\TreeDataSource\PluginManager as DataManager,
-    VuFind\Hierarchy\TreeRenderer\PluginManager as RendererManager;
+
+use VuFind\Hierarchy\TreeDataSource\PluginManager as DataManager;
+use VuFind\Hierarchy\TreeRenderer\PluginManager as RendererManager;
 
 /**
  * Hierarchy interface class.
@@ -36,18 +37,18 @@ use VuFind\Hierarchy\TreeDataSource\PluginManager as DataManager,
  * This should be extended to implement functionality for specific
  * Hierarchy Systems (i.e. Calm etc.).
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Hierarchy
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 abstract class AbstractBase
 {
     /**
      * Driver configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config;
 
@@ -82,12 +83,12 @@ abstract class AbstractBase
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config          Configuration
-     * @param DataManager         $dataManager     Tree data source plugin manager
-     * @param RendererManager     $rendererManager Tree renderer plugin manager
-     * @param array               $options         Extra options (if any)
+     * @param \Laminas\Config\Config $config          Configuration
+     * @param DataManager            $dataManager     Tree data source plugin manager
+     * @param RendererManager        $rendererManager Tree renderer plugin manager
+     * @param array                  $options         Extra options (if any)
      */
-    public function __construct(\Zend\Config\Config $config,
+    public function __construct(\Laminas\Config\Config $config,
         DataManager $dataManager, RendererManager $rendererManager,
         $options = []
     ) {
@@ -95,7 +96,7 @@ abstract class AbstractBase
         $this->dataManager = $dataManager;
         $this->rendererManager = $rendererManager;
         if (isset($options['enabled'])) {
-            $this->enabled = (bool) $options['enabled'];
+            $this->enabled = (bool)$options['enabled'];
         }
     }
 

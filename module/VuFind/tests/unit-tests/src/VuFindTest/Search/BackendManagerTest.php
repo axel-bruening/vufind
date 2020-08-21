@@ -3,7 +3,7 @@
 /**
  * BackendManager unit tests.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,29 +18,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Search;
 
+use Laminas\EventManager\SharedEventManager;
 use VuFind\Search\BackendManager;
-use VuFindTest\Unit\TestCase as TestCase;
 
-use Zend\EventManager\SharedEventManager;
+use VuFindTest\Unit\TestCase as TestCase;
 
 /**
  * BackendManager unit tests.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class BackendManagerTest extends TestCase
 {
@@ -48,13 +48,13 @@ class BackendManagerTest extends TestCase
      * Test that get() throws on a non-object.
      *
      * @return void
-     *
-     * @expectedException        UnexpectedValueException
-     * @expectedExceptionMessage Expected backend registry to return object
      */
     public function testGetThrowsOnNonObject()
     {
-        $registry = $this->getMockForAbstractClass('Zend\ServiceManager\ServiceLocatorInterface');
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('Expected backend registry to return object');
+
+        $registry = $this->getMockForAbstractClass(\Laminas\ServiceManager\ServiceLocatorInterface::class);
         $registry->expects($this->once())
             ->method('get')
             ->will($this->returnValue('not-an-object'));
@@ -66,13 +66,13 @@ class BackendManagerTest extends TestCase
      * Test that get() throws on a non-backend.
      *
      * @return void
-     *
-     * @expectedException        UnexpectedValueException
-     * @expectedExceptionMessage does not implement the expected interface
      */
     public function testGetThrowsOnNonBackend()
     {
-        $registry = $this->getMockForAbstractClass('Zend\ServiceManager\ServiceLocatorInterface');
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('does not implement the expected interface');
+
+        $registry = $this->getMockForAbstractClass(\Laminas\ServiceManager\ServiceLocatorInterface::class);
         $registry->expects($this->once())
             ->method('get')
             ->will($this->returnValue($this));
@@ -87,7 +87,7 @@ class BackendManagerTest extends TestCase
      */
     public function testAttachDetachShared()
     {
-        $registry = $this->getMockForAbstractClass('Zend\ServiceManager\ServiceLocatorInterface');
+        $registry = $this->getMockForAbstractClass(\Laminas\ServiceManager\ServiceLocatorInterface::class);
         $events   = new SharedEventManager();
         $manager  = new BackendManager($registry);
         $manager->attachShared($events);

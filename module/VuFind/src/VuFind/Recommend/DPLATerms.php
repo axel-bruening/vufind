@@ -2,7 +2,7 @@
 /**
  * DPLATerms Recommendations Module
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 namespace VuFind\Recommend;
-use Zend\Http\Client as HttpClient,
-    Zend\Http\Client\Adapter\Exception\TimeoutException;
+
+use Laminas\Http\Client\Adapter\Exception\TimeoutException;
+use Laminas\Http\Client as HttpClient;
 
 /**
  * DPLATerms Recommendations Module
  *
  * This class uses current search terms to query the DPLA API.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 class DPLATerms implements RecommendInterface
 {
@@ -76,7 +77,7 @@ class DPLATerms implements RecommendInterface
      * @var array
      */
     protected $formatMap = [
-        'authorStr'           => 'sourceResource.creator',
+        'author_facet'        => 'sourceResource.creator',
         'building'            => 'provider.name',
         'format'              => 'sourceResource.format',
         'geographic_facet'    => 'sourceResource.spatial.region',
@@ -125,7 +126,7 @@ class DPLATerms implements RecommendInterface
      * Abstract-required method
      *
      * @param \VuFind\Search\Base\Params $params  Search parameter object
-     * @param \Zend\StdLib\Parameters    $request Parameter object representing user
+     * @param \Laminas\Stdlib\Parameters $request Parameter object representing user
      * request.
      *
      * @return void
@@ -182,7 +183,7 @@ class DPLATerms implements RecommendInterface
     {
         // Extract the first search term from the search object:
         $search = $this->searchObject->getParams()->getQuery();
-        $filters = $this->searchObject->getParams()->getFilters();
+        $filters = $this->searchObject->getParams()->getRawFilters();
         $lookfor = ($search instanceof \VuFindSearch\Query\Query)
             ? $search->getString()
             : '';

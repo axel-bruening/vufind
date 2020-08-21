@@ -2,7 +2,7 @@
 /**
  * Collection Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,36 +17,40 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Controller;
+
+use Laminas\Config\Config;
+use Laminas\ServiceManager\ServiceLocatorInterface;
 
 /**
  * Collection Controller
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class CollectionController extends AbstractRecord
 {
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config VuFind configuration
+     * @param ServiceLocatorInterface $sm     Service manager
+     * @param Config                  $config VuFind configuration
      */
-    public function __construct(\Zend\Config\Config $config)
+    public function __construct(ServiceLocatorInterface $sm, Config $config)
     {
         // Call standard record controller initialization:
-        parent::__construct();
+        parent::__construct($sm);
 
         // Set default tab, if specified:
         if (isset($config->Collections->defaultTab)) {
@@ -57,12 +61,13 @@ class CollectionController extends AbstractRecord
     /**
      * Get the tab configuration for this controller.
      *
-     * @return array
+     * @return \VuFind\RecordTab\TabManager
      */
-    protected function getTabConfiguration()
+    protected function getRecordTabManager()
     {
-        $cfg = $this->getServiceLocator()->get('Config');
-        return $cfg['vufind']['recorddriver_collection_tabs'];
+        $manager = parent::getRecordTabManager();
+        $manager->setContext('collection');
+        return $manager;
     }
 
     /**
@@ -75,8 +80,14 @@ class CollectionController extends AbstractRecord
      */
     protected function showTab($tab, $ajax = false)
     {
+        // Check that collections are enabled and redirect if necessary
+        $config = $this->getConfig();
+        if (empty($config->Collections->collections)) {
+            return $this->redirectToRecord();
+        }
+
         $result = parent::showTab($tab, $ajax);
-        if (!$ajax && $result instanceof \Zend\View\Model\ViewModel) {
+        if (!$ajax && $result instanceof \Laminas\View\Model\ViewModel) {
             $result->setTemplate('collection/view');
         }
         return $result;
@@ -89,8 +100,9 @@ class CollectionController extends AbstractRecord
      */
     protected function resultScrollerActive()
     {
-        $config = $this->getServiceLocator()->get('VuFind\Config')->get('config');
-        return (isset($config->Record->next_prev_navigation)
-            && $config->Record->next_prev_navigation);
+        $config = $this->serviceLocator->get(\VuFind\Config\PluginManager::class)
+            ->get('config');
+        return isset($config->Record->next_prev_navigation)
+            && $config->Record->next_prev_navigation;
     }
 }

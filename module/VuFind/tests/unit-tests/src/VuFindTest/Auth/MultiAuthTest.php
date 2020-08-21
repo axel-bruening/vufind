@@ -2,7 +2,7 @@
 /**
  * MultiAuth authentication test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Auth;
-use VuFind\Auth\MultiAuth, Zend\Config\Config;
+
+use Laminas\Config\Config;
 
 /**
  * LDAP authentication test class.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
 {
@@ -51,14 +52,9 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
         if (null === $config) {
             $config = $this->getAuthConfig();
         }
-        $serviceLocator = new \VuFind\Auth\PluginManager(
-            new \Zend\ServiceManager\Config(
-                [
-                    'abstract_factories' => ['VuFind\Auth\PluginFactory'],
-                ]
-            )
-        );
-        $obj = clone($this->getAuthManager()->get('MultiAuth'));
+        $manager = $this->getAuthManager();
+        $obj = clone $manager->get('MultiAuth');
+        $obj->setPluginManager($manager);
         $obj->setConfig($config);
         return $obj;
     }
@@ -85,7 +81,8 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testWithMissingMethodOrder()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $config = $this->getAuthConfig();
         unset($config->MultiAuth->method_order);
         $this->getAuthObject($config)->getConfig();
@@ -97,15 +94,15 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
      *
      * @param array $overrides Associative array of parameters to override.
      *
-     * @return \Zend\Http\Request
+     * @return \Laminas\Http\Request
      */
     protected function getLoginRequest($overrides = [])
     {
         $post = $overrides + [
             'username' => 'testuser', 'password' => 'testpass'
         ];
-        $request = new \Zend\Http\Request();
-        $request->setPost(new \Zend\Stdlib\Parameters($post));
+        $request = new \Laminas\Http\Request();
+        $request->setPost(new \Laminas\Stdlib\Parameters($post));
         return $request;
     }
 
@@ -116,8 +113,8 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBadService()
     {
-        $this
-            ->setExpectedException('Zend\ServiceManager\Exception\ServiceNotFoundException');
+        $this->expectException(\Laminas\ServiceManager\Exception\ServiceNotFoundException::class);
+
         $config = $this->getAuthConfig();
         $config->MultiAuth->method_order = 'InappropriateService,Database';
 
@@ -134,8 +131,8 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBadClass()
     {
-        $this
-            ->setExpectedException('Zend\ServiceManager\Exception\RuntimeException');
+        $this->expectException(\Laminas\ServiceManager\Exception\InvalidServiceException::class);
+
         $config = $this->getAuthConfig();
         $config->MultiAuth->method_order = get_class($this) . ',Database';
 
@@ -150,7 +147,8 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['username' => '']);
         $this->getAuthObject()->authenticate($request);
     }
@@ -162,7 +160,8 @@ class MultiAuthTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankPassword()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['password' => '']);
         $this->getAuthObject()->authenticate($request);
     }

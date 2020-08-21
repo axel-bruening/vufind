@@ -2,7 +2,7 @@
 /**
  * Base class to enable sharing of common methods between SMS subclasses
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2009.
  *
@@ -17,43 +17,43 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Ronan McHugh <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\SMS;
 
 /**
  * Base class to enable sharing of common methods between SMS subclasses
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Ronan McHugh <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 abstract class AbstractBase implements SMSInterface
 {
     /**
      * SMS configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $smsConfig;
 
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config  SMS configuration
-     * @param array               $options Additional options
+     * @param \Laminas\Config\Config $config  SMS configuration
+     * @param array                  $options Additional options
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function __construct(\Zend\Config\Config $config, $options = [])
+    public function __construct(\Laminas\Config\Config $config, $options = [])
     {
         $this->smsConfig = $config;
     }

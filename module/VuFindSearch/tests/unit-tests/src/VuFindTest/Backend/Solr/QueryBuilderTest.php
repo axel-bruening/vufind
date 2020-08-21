@@ -3,7 +3,7 @@
 /**
  * Unit tests for SOLR query builder
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,28 +18,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\Solr;
 
+use VuFindSearch\Backend\Solr\QueryBuilder;
 use VuFindSearch\Query\Query;
 use VuFindSearch\Query\QueryGroup;
-use VuFindSearch\Backend\Solr\QueryBuilder;
 
 /**
  * Unit tests for SOLR query builder
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class QueryBuilderTest extends \VuFindTest\Unit\TestCase
 {
@@ -75,10 +75,9 @@ class QueryBuilderTest extends \VuFindTest\Unit\TestCase
             ['^10', '10'],                       // invalid boosts
             ['test^ test^6', 'test test6'],      // invalid boosts
             ['test^1 test^2', 'test^1 test^2'],  // valid boosts
-            ['this / that', 'this that'],        // freestanding slash
+            ['this / that', 'this "/" that'],    // freestanding slash
             ['/ this', 'this'],                  // leading slash
             ['title /', 'title'],                // trailing slash
-            ['this - that', 'this that'],        // freestanding hyphen
             ['- this', 'this'],                  // leading hyphen
             ['title -', 'title'],                // trailing hyphen
             ['AND', 'and'],                      // freestanding operator
@@ -102,31 +101,160 @@ class QueryBuilderTest extends \VuFindTest\Unit\TestCase
     }
 
     /**
+     * Return array of [test query, expected result] arrays.
+     *
+     * @return array
+     */
+    protected function getQuestionTests()
+    {
+        // Format: [input, expected output, flags array]
+        // @codingStandardsIgnoreStart
+        return [
+            // trailing question mark:
+            ['this?', '(this?) OR (this\?)', []],
+            // question mark after first word:
+            ['this? that', '((this?) OR (this\?)) that', []],
+            // question mark after the middle word:
+            ['start this? that', 'start ((this?) OR (this\?)) that', []],
+            // question mark with boolean operators:
+            ['start AND this? AND that', 'start AND ((this?) OR (this\?)) AND that', []],
+            // question mark as a wildcard in the middle of a word:
+            ['start t?his that', 'start t?his that', []],
+            // multiple ? terms:
+            ['start? this?', '((start?) OR (start\?)) ((this?) OR (this\?))', []],
+            // ? term in field-specific context:
+            ['xyzzy:this?', 'xyzzy:((this?) OR (this\?))', []],
+            // ? term in field-specific context w/ extra term:
+            ['xyzzy:(this? that)', 'xyzzy:(((this?) OR (this\?)) that)', []],
+            // Multiple fields, one w/ ? term:
+            ['foo:this? OR bar:tha?t', 'foo:((this?) OR (this\?)) OR bar:tha?t', []],
+            // repeating ? term:
+            ['this? that? this?', '((this?) OR (this\?)) ((that?) OR (that\?)) ((this?) OR (this\?))', []],
+            // ? terms inside quoted phrase (basic flag set to indicate that
+            // this does not contain any syntax unsupported by basic Dismax):
+            ['"this? that?"', '"this? that?"', ['basic' => true]],
+        ];
+        // @codingStandardsIgnoreEnd
+    }
+
+    /**
+     * Run a test case through a basic query.
+     *
+     * @param QueryBuilder $qb      Query builder
+     * @param string       $handler Search handler: dismax|edismax|standard
+     * @param array        $test    Test to run
+     *
+     * @return void
+     */
+    protected function runBasicQuestionTest($qb, $handler, $test)
+    {
+        list($input, $output, $flags) = $test;
+        if ($handler === 'standard'
+            || ($handler === 'dismax' && empty($flags['basic']))
+        ) {
+            // We expect an extra set of parentheses to be added, unless the
+            // string contains a colon, in which case some processing will be
+            // skipped due to field-specific query behavior.
+            $basicOutput = strstr($output, ':') ? $output : '(' . $output . ')';
+        } else {
+            $basicOutput = $output;
+        }
+        $q = new Query($input, 'test');
+        $before = $q->getString();
+        $response = $qb->build($q);
+        // Make sure the query builder had no side effects on the query object:
+        $this->assertEquals($before, $q->getString());
+        $processedQ = $response->get('q');
+        $this->assertEquals($basicOutput, $processedQ[0]);
+    }
+
+    /**
+     * Run a test case through an advanced query.
+     *
+     * @param QueryBuilder $qb      Query builder
+     * @param string       $handler Search handler: dismax|edismax|standard
+     * @param array        $test    Test to run
+     *
+     * @return void
+     */
+    protected function runAdvancedQuestionTest($qb, $handler, $test)
+    {
+        list($input, $output, $flags) = $test;
+        if ($handler === 'standard'
+            || ($handler === 'dismax' && empty($flags['basic']))
+        ) {
+            $advOutput = '((' . $output . '))';
+        } else {
+            $mm = $handler == 'dismax' ? '100%' : '0%';
+            $advOutput = "((_query_:\"{!$handler qf=\\\"foo\\\" mm=\\'$mm\\'}"
+                . addslashes($output) . '"))';
+        }
+        $advancedQ = new QueryGroup('AND', [new Query($input, 'test')]);
+        $advResponse = $qb->build($advancedQ);
+        $advProcessedQ = $advResponse->get('q');
+        $this->assertEquals($advOutput, $advProcessedQ[0]);
+    }
+
+    /**
+     * Run the standard suite of question mark tests, accounting for differences
+     * between stanard Lucene, basic Dismax and eDismax handlers.
+     *
+     * @param array  $builderParams Parameters for QueryBuilder constructor
+     * @param string $handler       Search handler: dismax|edismax|standard
+     *
+     * @return void
+     */
+    protected function runQuestionTests($builderParams, $handler)
+    {
+        // Set up an array of expected inputs and outputs:
+        $tests = $this->getQuestionTests();
+        $qb = new QueryBuilder($builderParams);
+        foreach ($tests as $test) {
+            $this->runBasicQuestionTest($qb, $handler, $test);
+            $this->runAdvancedQuestionTest($qb, $handler, $test);
+        }
+    }
+
+    /**
      * Test generation with a query handler
      *
      * @return void
      */
     public function testQueryHandler()
     {
-        // Set up an array of expected inputs and outputs:
-        // @codingStandardsIgnoreStart
-        $tests = [
-            ['this?', '((this?) OR (this\?))'],// trailing question mark
-        ];
-        // @codingStandardsIgnoreEnd
-
-        $qb = new QueryBuilder(
+        $this->runQuestionTests(
             [
                 'test' => []
-            ]
+            ], 'standard'
         );
-        foreach ($tests as $test) {
-            list($input, $output) = $test;
-            $q = new Query($input, 'test');
-            $response = $qb->build($q);
-            $processedQ = $response->get('q');
-            $this->assertEquals($output, $processedQ[0]);
-        }
+    }
+
+    /**
+     * Test generation with a query handler with regular dismax
+     *
+     * @return void
+     */
+    public function testQueryHandlerWithDismax()
+    {
+        $this->runQuestionTests(
+            [
+                'test' => ['DismaxHandler' => 'dismax', 'DismaxFields' => ['foo']]
+            ], 'dismax'
+        );
+    }
+
+    /**
+     * Test generation with a query handler with edismax
+     *
+     * @return void
+     */
+    public function testQueryHandlerWithEdismax()
+    {
+        $this->runQuestionTests(
+            [
+                'test' => ['DismaxHandler' => 'edismax', 'DismaxFields' => ['foo']]
+            ], 'edismax'
+        );
     }
 
     /**
@@ -217,42 +345,82 @@ class QueryBuilderTest extends \VuFindTest\Unit\TestCase
     }
 
     /**
-     * Test generation with highlighting
+     * Test hl.q edge case: when we are in dismax (not edismax) mode, and a boost
+     * is set, and a query contains advanced syntax, VuFind manipulates the query
+     * to trigger the boost and sets hl.q to prevent the highlighter from matching
+     * the wrong words.
      *
      * @return void
      */
-    public function testHighlighting()
+    public function testHlQ()
     {
         $qb = new QueryBuilder(
             [
                 'test' => [
-                    'DismaxFields' => ['test1'],
-                    'DismaxParams' => [['bq', 'boost']]
+                    'DismaxFields' => ['test'],
+                    'DismaxHandler' => 'dismax',
+                    'DismaxParams' => [['bq', 'boost']],
                 ]
             ]
         );
 
-        $q = new Query('*:*', 'test');
+        $q = new Query('my friend*', 'test');
 
-        // No hl.q if highlighting query disabled:
-        $qb->setCreateHighlightingQuery(false);
+        $qb->setFieldsToHighlight('*');
         $response = $qb->build($q);
-        $hlQ = $response->get('hl.q');
-        $this->assertEquals(null, $hlQ[0]);
-
-        // hl.q if highlighting query enabled:
-        $qb->setCreateHighlightingQuery(true);
-        $response = $qb->build($q);
-        $hlQ = $response->get('hl.q');
-        $this->assertEquals('*:*', $hlQ[0]);
+        $hlq = $response->get('hl.q');
+        $q = $response->get('q');
+        $this->assertEquals('(my friend*)', $hlq[0]);
+        $this->assertEquals('((my friend*)) AND (*:* OR boost)', $q[0]);
     }
 
     /**
-     * Test generation with spelling
+     * Test generation with highlighting, using the setFieldsToHighlight() method.
      *
      * @return void
      */
-    public function testSpelling()
+    public function testSetFieldsToHighlight()
+    {
+        $qb = new QueryBuilder(
+            [
+                'test' => [
+                    'QueryFields' => ['test1' => []],
+                    'DismaxFields' => ['test2', 'test3^10000'],
+                ]
+            ]
+        );
+
+        $q = new Query('my friend', 'test');
+
+        // Map of field list to expected hl.fl output.
+        $tests = [
+            // No hl.fl if highlight field list is empty:
+            '' => null,
+            // hl.fl set when field list is wildcard:
+            '*' => 'test1,test2,test3',
+            // No hl.fl if field list doesn't match handler list:
+            'test4,test5' => null,
+            // hl.fl contains intersection of field list and handler list
+            // (testing with a comma-separated field list)
+            'test1,test2,test6' => 'test1,test2',
+            // hl.fl contains intersection of field list and handler list
+            // (testing with a space-separated field list)
+            'test1 test3 test5' => 'test1,test3',
+        ];
+        foreach ($tests as $input => $output) {
+            $qb->setFieldsToHighlight($input);
+            $response = $qb->build($q);
+            $hlfl = $response->get('hl.fl');
+            $this->assertEquals($output, $hlfl[0] ?? null);
+        }
+    }
+
+    /**
+     * Test generation with spelling, using the setCreateSpellingQuery() method.
+     *
+     * @return void
+     */
+    public function testSetCreateSpellingQuery()
     {
         $qb = new QueryBuilder(
             [
@@ -267,15 +435,15 @@ class QueryBuilderTest extends \VuFindTest\Unit\TestCase
 
         // No spellcheck.q if spellcheck query disabled:
         $qb->setCreateSpellingQuery(false);
-        $response = $qb->build($q);
-        $spQ = $response->get('spellcheck.q');
-        $this->assertEquals(null, $spQ[0]);
+        $response1 = $qb->build($q);
+        $spQ1 = $response1->get('spellcheck.q');
+        $this->assertFalse(isset($spQ1[0]));
 
         // spellcheck.q if spellcheck query enabled:
         $qb->setCreateSpellingQuery(true);
-        $response = $qb->build($q);
-        $spQ = $response->get('spellcheck.q');
-        $this->assertEquals('my friend', $spQ[0]);
+        $response2 = $qb->build($q);
+        $spQ2 = $response2->get('spellcheck.q');
+        $this->assertEquals('my friend', $spQ2[0]);
     }
 
     /**
@@ -302,7 +470,7 @@ class QueryBuilderTest extends \VuFindTest\Unit\TestCase
 
         $response = $qb->build($q);
         $processedQ = $response->get('q');
-        $this->assertEquals('((_query_:"{!dismax qf=\"field_a\" }value1") OR (_query_:"{!dismax qf=\"field_b\" }value2"))', $processedQ[0]);
+        $this->assertEquals('((_query_:"{!dismax qf=\"field_a\" mm=\\\'100%\\\'}value1") OR (_query_:"{!dismax qf=\"field_b\" mm=\\\'100%\\\'}value2"))', $processedQ[0]);
     }
 
     /**
@@ -333,7 +501,7 @@ class QueryBuilderTest extends \VuFindTest\Unit\TestCase
 
         $response = $qb->build($q);
         $processedQ = $response->get('q');
-        $this->assertEquals('((field_a:(value*)^100 OR field_c:(value*)^200) OR (_query_:"{!dismax qf=\"field_b\" }value2"))', $processedQ[0]);
+        $this->assertEquals('((field_a:(value*)^100 OR field_c:(value*)^200) OR (_query_:"{!dismax qf=\"field_b\" mm=\\\'100%\\\'}value2"))', $processedQ[0]);
     }
 
     /**

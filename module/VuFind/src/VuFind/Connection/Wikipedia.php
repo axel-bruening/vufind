@@ -2,7 +2,7 @@
 /**
  * Wikipedia connection class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Connection
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Connection;
+
 use VuFind\I18n\Translator\TranslatorAwareInterface;
 
 /**
  * Wikipedia connection class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Connection
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
- * @view     AuthorInfoFacets.phtml
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Wikipedia implements TranslatorAwareInterface
 {
@@ -45,7 +45,7 @@ class Wikipedia implements TranslatorAwareInterface
     /**
      * HTTP client
      *
-     * @var \Zend\Http\Client
+     * @var \Laminas\Http\Client
      */
     protected $client;
 
@@ -66,9 +66,9 @@ class Wikipedia implements TranslatorAwareInterface
     /**
      * Constructor
      *
-     * @param \Zend\Http\Client $client HTTP client
+     * @param \Laminas\Http\Client $client HTTP client
      */
-    public function __construct(\Zend\Http\Client $client)
+    public function __construct(\Laminas\Http\Client $client)
     {
         $this->client = $client;
     }
@@ -362,11 +362,16 @@ class Wikipedia implements TranslatorAwareInterface
             $page = array_shift($page['revisions']);
             // Check for redirection
             $as_lines = explode("\n", $page['*']);
-            if (stristr($as_lines[0], '#REDIRECT')) {
-                preg_match('/\[\[(.*)\]\]/', $as_lines[0], $matches);
-                $redirectTo = $matches[1];
-            } else {
-                $redirectTo = false;
+            $redirectTo = false;
+            $redirectTokens = ['#REDIRECT', '#WEITERLEITUNG', '#OMDIRIGERING'];
+            foreach ($redirectTokens as $redirectToken) {
+                if (stristr($as_lines[0], $redirectToken)) {
+                    preg_match('/\[\[(.*)\]\]/', $as_lines[0], $matches);
+                    $redirectTo = $matches[1];
+                    break;
+                }
+            }
+            if (!$redirectTo) {
                 break;
             }
         }
@@ -450,9 +455,7 @@ class Wikipedia implements TranslatorAwareInterface
             $imageUrl = $this->getWikipediaImageURL($imageName);
             if ($imageUrl != false) {
                 $info['image'] = $imageUrl;
-                $info['altimage'] = isset($imageCaption)
-                    ? $imageCaption
-                    : $name;
+                $info['altimage'] = $imageCaption ?? $name;
             }
         }
 
@@ -501,6 +504,6 @@ class Wikipedia implements TranslatorAwareInterface
             }
         }
 
-        return isset($imageUrl) ? $imageUrl : false;
+        return $imageUrl ?? false;
     }
 }

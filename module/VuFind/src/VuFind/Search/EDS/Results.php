@@ -2,7 +2,7 @@
 /**
  * EDS API Results
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) EBSCO Industries 2013
  *
@@ -17,45 +17,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  EBSCO
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\EDS;
-
-use EBSCO\EdsApi\SearchCriteria;
 
 /**
  * EDS API Results
  *
- * @category VuFind2
+ * @category VuFind
  * @package  EBSCO
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Results extends \VuFind\Search\Base\Results
 {
     /**
-     * Search criteria available for a given search
+     * Search backend identifier.
      *
-     * @var array
+     * @var string
      */
-    protected $searchCriteria;
-
-    /**
-     * Obtain the search criteria available for this searching session (if present)
-     *
-     * @return SearchCriteria
-     */
-    public function getSearchCriteria()
-    {
-        return $this->searchCriteria;
-    }
+    protected $backendId = 'EDS';
 
     /**
      * Support method for performAndProcessSearch -- perform a search based on the
@@ -70,18 +58,18 @@ class Results extends \VuFind\Search\Base\Results
         $offset = $this->getStartRecord() - 1;
         $params = $this->getParams()->getBackendParameters();
         $collection = $this->getSearchService()->search(
-            'EDS', $query, $offset, $limit, $params
+            $this->backendId, $query, $offset, $limit, $params
         );
         if (null != $collection) {
             $this->responseFacets = $collection->getFacets();
             $this->resultTotal = $collection->getTotal();
 
-            //Add a publication date facet
+            // Add a publication date facet
             $this->responseFacets[] = [
-                        'fieldName' => 'PublicationDate',
-                        'displayName' => 'PublicationDate',
-                        'displayText' => 'Publication Date',
-                        'counts' => []
+                'fieldName' => 'PublicationDate',
+                'displayName' => 'PublicationDate',
+                'displayText' => 'Publication Date',
+                'counts' => []
             ];
 
             // Construct record drivers for all the items in the response:
@@ -99,17 +87,29 @@ class Results extends \VuFind\Search\Base\Results
      */
     public function getFacetList($filter = null)
     {
+        // If there is no filter, we'll use all facets as the filter:
+        if (null === $filter) {
+            $filter = $this->getParams()->getFacetConfig();
+        }
+        $filterFields = array_keys($filter);
+
         // Loop through the facets returned by EDS
         $facetResult = [];
         if (is_array($this->responseFacets)) {
             // Get the filter list -- we'll need to check it below:
-            $filterList = $this->getParams()->getFilters();
+            $filterList = $this->getParams()->getRawFilters();
             $translatedFacets = $this->getOptions()->getTranslatedFacets();
             foreach ($this->responseFacets as $current) {
                 // The "displayName" value is actually the name of the field on
                 // EBSCO's side -- we'll probably need to translate this to a
                 // different value for actual display!
                 $field = $current['displayName'];
+
+                // If we are filtering out the field, skip it!
+                $currentFilterKey = array_search($field, $filterFields);
+                if ($currentFilterKey === false) {
+                    continue;
+                }
 
                 // Should we translate values for the current facet?
                 if ($translate = in_array($field, $translatedFacets)) {
@@ -124,8 +124,7 @@ class Results extends \VuFind\Search\Base\Results
                     // present in the filter list?  Second, is the current value
                     // an active filter for the current field?
                     $orField = '~' . $field;
-                    $itemsToCheck = isset($filterList[$field])
-                        ? $filterList[$field] : [];
+                    $itemsToCheck = $filterList[$field] ?? [];
                     if (isset($filterList[$orField])) {
                         $itemsToCheck += $filterList[$orField];
                     }
@@ -149,14 +148,13 @@ class Results extends \VuFind\Search\Base\Results
                         = $facetDetails['value'];
                 }
                 // The EDS API returns facets in the order they should be displayed
-                $current['label'] = isset($filter[$field])
-                    ? $filter[$field] : $field;
+                $current['label'] = $filter[$field] ?? $field;
 
                 // Create a reference to counts called list for consistency with
                 // Solr output format -- this allows the facet recommendations
-                // modules to be shared between the Search and Summon modules.
+                // modules to be shared between the Search and other modules.
                 $current['list'] = & $current['counts'];
-                $facetResult[] = $current;
+                $facetResult[$currentFilterKey] = $current;
             }
         }
         ksort($facetResult);

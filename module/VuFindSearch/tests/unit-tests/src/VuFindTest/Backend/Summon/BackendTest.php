@@ -3,7 +3,7 @@
 /**
  * Unit tests for Summon Backend class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,34 +18,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\Summon;
 
-use VuFindSearch\ParamBag;
-use VuFindSearch\Query\Query;
+use InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
 
 use SerialsSolutions_Summon_Exception as SummonException;
 use SerialsSolutions_Summon_Query as SummonQuery;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use VuFindSearch\ParamBag;
 
-use InvalidArgumentException;
+use VuFindSearch\Query\Query;
 
 /**
  * Unit tests for Summon Backend class.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class BackendTest extends TestCase
 {
@@ -54,7 +54,7 @@ class BackendTest extends TestCase
      *
      * @return void
      */
-    protected function setup()
+    protected function setUp(): void
     {
         if (!class_exists('SerialsSolutions_Summon_Exception', true)) {
             $this->markTestIncomplete('Unable to autoload class: SerialsSolutions\Summon\Exception');
@@ -120,12 +120,12 @@ class BackendTest extends TestCase
      * Test retrieve exception handling.
      *
      * @return void
-     *
-     * @expectedException VuFindSearch\Backend\Exception\BackendException
      */
     public function testRetrieveWrapsSummonException()
     {
-        $fact = $this->getMock('VuFindSearch\Response\RecordCollectionFactoryInterface');
+        $this->expectException(\VuFindSearch\Backend\Exception\BackendException::class);
+
+        $fact = $this->createMock(\VuFindSearch\Response\RecordCollectionFactoryInterface::class);
         $conn = $this->getConnectorMock(['getRecord']);
         $conn->expects($this->once())
             ->method('getRecord')
@@ -172,12 +172,12 @@ class BackendTest extends TestCase
      * Test search exception handling.
      *
      * @return void
-     *
-     * @expectedException VuFindSearch\Backend\Exception\BackendException
      */
     public function testSearchWrapsSummonException()
     {
-        $fact = $this->getMock('VuFindSearch\Response\RecordCollectionFactoryInterface');
+        $this->expectException(\VuFindSearch\Backend\Exception\BackendException::class);
+
+        $fact = $this->createMock(\VuFindSearch\Response\RecordCollectionFactoryInterface::class);
         $conn = $this->getConnectorMock(['query']);
         $conn->expects($this->once())
             ->method('query')
@@ -211,7 +211,7 @@ class BackendTest extends TestCase
      */
     public function testConstructorSetters()
     {
-        $fact = $this->getMock('VuFindSearch\Response\RecordCollectionFactoryInterface');
+        $fact = $this->createMock(\VuFindSearch\Response\RecordCollectionFactoryInterface::class);
         $conn = $this->getConnectorMock();
         $back = new Backend($conn, $fact);
         $this->assertEquals($fact, $back->getRecordCollectionFactory());
@@ -260,8 +260,9 @@ class BackendTest extends TestCase
      */
     protected function getConnectorMock(array $mock = [])
     {
-        return $this->getMock(
-            'SerialsSolutions\Summon\Zend2', $mock, ['id', 'key']
-        );
+        return $this->getMockBuilder(\SerialsSolutions\Summon\Laminas::class)
+            ->setMethods($mock)
+            ->setConstructorArgs(['id', 'key'])
+            ->getMock();
     }
 }

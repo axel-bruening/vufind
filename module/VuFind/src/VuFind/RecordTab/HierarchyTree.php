@@ -2,7 +2,7 @@
 /**
  * HierarchyTree tab
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 namespace VuFind\RecordTab;
 
 /**
  * HierarchyTree tab
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 class HierarchyTree extends AbstractBase
 {
@@ -48,16 +48,16 @@ class HierarchyTree extends AbstractBase
     /**
      * Configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config = null;
 
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config Configuration
+     * @param \Laminas\Config\Config $config Configuration
      */
-    public function __construct(\Zend\Config\Config $config)
+    public function __construct(\Laminas\Config\Config $config)
     {
         $this->config = $config;
     }
@@ -65,7 +65,7 @@ class HierarchyTree extends AbstractBase
     /**
      * Get the VuFind configuration.
      *
-     * @return \Zend\Config\Config
+     * @return \Laminas\Config\Config
      */
     protected function getConfig()
     {
@@ -191,7 +191,7 @@ class HierarchyTree extends AbstractBase
     public function searchActive()
     {
         $config = $this->getConfig();
-        return (!isset($config->Hierarchy->search) || $config->Hierarchy->search);
+        return !isset($config->Hierarchy->search) || $config->Hierarchy->search;
     }
 
     /**

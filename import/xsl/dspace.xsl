@@ -9,6 +9,7 @@
     <xsl:param name="institution">My University</xsl:param>
     <xsl:param name="collection">DSpace</xsl:param>
     <xsl:param name="urlPrefix">http</xsl:param>
+    <xsl:param name="geographic">false</xsl:param>
     <xsl:template match="oai_dc:dc">
         <add>
             <doc>
@@ -18,8 +19,8 @@
                     <xsl:value-of select="//identifier"/>
                 </field>
 
-                <!-- RECORDTYPE -->
-                <field name="recordtype">dspace</field>
+                <!-- RECORD FORMAT -->
+                <field name="record_format">dspace</field>
 
                 <!-- FULLRECORD -->
                 <!-- disabled for now; records are so large that they cause memory problems!
@@ -81,11 +82,11 @@
 
                 <!-- ADVISOR / CONTRIBUTOR -->
                 <xsl:if test="//dc:contributor[normalize-space()]">
-                    <field name="author_additional">
+                    <field name="author2">
                         <xsl:value-of select="//dc:contributor[normalize-space()]" />
                     </field>
                 </xsl:if>
-                
+
                 <!-- TYPE -->
                 <xsl:if test="//dc:type">
                     <field name="format">
@@ -97,19 +98,12 @@
                 <xsl:if test="//dc:creator">
                     <xsl:for-each select="//dc:creator">
                         <xsl:if test="normalize-space()">
-                            <!-- author is not a multi-valued field, so we'll put
-                                 first value there and subsequent values in author2.
-                             -->
+                            <field name="author">
+                                <xsl:value-of select="normalize-space()"/>
+                            </field>
+                            <!-- use first author value for sorting -->
                             <xsl:if test="position()=1">
-                                <field name="author">
-                                    <xsl:value-of select="normalize-space()"/>
-                                </field>
-                                <field name="author-letter">
-                                    <xsl:value-of select="normalize-space()"/>
-                                </field>
-                            </xsl:if>
-                            <xsl:if test="position()>1">
-                                <field name="author2">
+                                <field name="author_sort">
                                     <xsl:value-of select="normalize-space()"/>
                                 </field>
                             </xsl:if>
@@ -150,14 +144,31 @@
                     </field>
                 </xsl:if>
 
+                <!-- GEO -->
+                <xsl:if test="$geographic = 'true'">
+                    <xsl:for-each select="//dc:coverage">
+                        <xsl:if test="string-length(php:function('VuFindGeo::getAllCoordinatesFromCoverage', string(.))) > 0">
+                            <field name="long_lat">
+                                <xsl:value-of select="php:function('VuFindGeo::getAllCoordinatesFromCoverage', string(.))" />
+                            </field>
+                            <field name="long_lat_display">
+                                <xsl:value-of select="php:function('VuFindGeo::getDisplayCoordinatesFromCoverage', string(.))" />
+                            </field>
+                            <field name="long_lat_label">
+                                <xsl:value-of select="php:function('VuFindGeo::getLabelFromCoverage', string(.))" />
+                            </field>
+                        </xsl:if>
+                    </xsl:for-each>
+                </xsl:if>
+
                 <!-- URL -->
-               <xsl:for-each select="//dc:identifier">
-                   <xsl:if test="substring(., 1, string-length($urlPrefix)) = $urlPrefix">
-                       <field name="url">
-                           <xsl:value-of select="." />
-                       </field>
-                   </xsl:if>
-               </xsl:for-each>
+                <xsl:for-each select="//dc:identifier">
+                    <xsl:if test="substring(., 1, string-length($urlPrefix)) = $urlPrefix">
+                        <field name="url">
+                            <xsl:value-of select="." />
+                        </field>
+                    </xsl:if>
+                </xsl:for-each>
             </doc>
         </add>
     </xsl:template>

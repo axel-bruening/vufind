@@ -2,7 +2,7 @@
 /**
  * ILS Authenticator Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Auth;
-use VuFind\Auth\ILSAuthenticator, VuFind\Auth\Manager,
-    VuFind\Db\Row\User, VuFind\ILS\Connection as ILSConnection;
+
+use VuFind\Auth\ILSAuthenticator;
+use VuFind\Auth\Manager;
+use VuFind\Db\Row\User;
+use VuFind\ILS\Connection as ILSConnection;
 
 /**
  * ILS Authenticator Manager Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class ILSAuthenticatorTest extends \VuFindTest\Unit\TestCase
 {
@@ -82,11 +85,14 @@ class ILSAuthenticatorTest extends \VuFindTest\Unit\TestCase
      */
     public function testNewCatalogFailureByException()
     {
+        $this->expectException(\VuFind\Exception\ILS::class);
+        $this->expectExceptionMessage('kaboom');
+
         $manager = $this->getMockManager();
         $connection = $this->getMockConnection(['patronLogin']);
         $connection->expects($this->once())->method('patronLogin')->with($this->equalTo('user'), $this->equalTo('pass'))->will($this->throwException(new \VuFind\Exception\ILS('kaboom')));
         $auth = $this->getAuthenticator($manager, $connection);
-        $this->assertEquals(false, $auth->newCatalogLogin('user', 'pass'));
+        $auth->newCatalogLogin('user', 'pass');
     }
 
     /**
@@ -153,17 +159,19 @@ class ILSAuthenticatorTest extends \VuFindTest\Unit\TestCase
      */
     public function testExceptionDuringStoredLoginAttempt()
     {
+        $this->expectException(\VuFind\Exception\ILS::class);
+        $this->expectExceptionMessage('kaboom');
+
         $user = $this->getMockUser(['__get', '__isset', 'clearCredentials', 'getCatPassword']);
         $user->expects($this->any())->method('__get')->with($this->equalTo('cat_username'))->will($this->returnValue('user'));
         $user->expects($this->any())->method('__isset')->with($this->equalTo('cat_username'))->will($this->returnValue(true));
         $user->expects($this->any())->method('getCatPassword')->will($this->returnValue('pass'));
-        $user->expects($this->once())->method('clearCredentials');
         $manager = $this->getMockManager(['isLoggedIn']);
         $manager->expects($this->any())->method('isLoggedIn')->will($this->returnValue($user));
         $connection = $this->getMockConnection(['patronLogin']);
         $connection->expects($this->once())->method('patronLogin')->with($this->equalTo('user'), $this->equalTo('pass'))->will($this->throwException(new \VuFind\Exception\ILS('kaboom')));
         $auth = $this->getAuthenticator($manager, $connection);
-        $this->assertEquals(false, $auth->storedCatalogLogin());
+        $auth->storedCatalogLogin();
     }
 
     /**
@@ -194,7 +202,7 @@ class ILSAuthenticatorTest extends \VuFindTest\Unit\TestCase
      */
     protected function getMockUser($methods = null)
     {
-        return $this->getMockBuilder('VuFind\Db\Row\User')
+        return $this->getMockBuilder(\VuFind\Db\Row\User::class)
             ->disableOriginalConstructor()
             ->setMethods($methods)
             ->getMock();
@@ -209,7 +217,7 @@ class ILSAuthenticatorTest extends \VuFindTest\Unit\TestCase
      */
     protected function getMockManager($methods = null)
     {
-        return $this->getMockBuilder('VuFind\Auth\Manager')
+        return $this->getMockBuilder(\VuFind\Auth\Manager::class)
             ->disableOriginalConstructor()
             ->setMethods($methods)
             ->getMock();
@@ -224,7 +232,7 @@ class ILSAuthenticatorTest extends \VuFindTest\Unit\TestCase
      */
     protected function getMockConnection($methods = null)
     {
-        return $this->getMockBuilder('VuFind\ILS\Connection')
+        return $this->getMockBuilder(\VuFind\ILS\Connection::class)
             ->disableOriginalConstructor()
             ->setMethods($methods)
             ->getMock();

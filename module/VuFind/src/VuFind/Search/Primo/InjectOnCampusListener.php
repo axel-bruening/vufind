@@ -2,7 +2,7 @@
 /**
  * OnCampus listener.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -17,31 +17,30 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Primo;
 
-use Zend\EventManager\SharedEventManagerInterface;
-use Zend\EventManager\EventInterface;
+use Laminas\EventManager\EventInterface;
+use Laminas\EventManager\SharedEventManagerInterface;
 
-use ZfcRbac\Service\AuthorizationServiceAwareInterface,
-    ZfcRbac\Service\AuthorizationServiceAwareTrait;
+use LmcRbacMvc\Service\AuthorizationServiceAwareTrait;
 
 /**
  * OnCampus listener.
  * This listener detects whether a user is on campus or not.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class InjectOnCampusListener
 {
@@ -57,7 +56,7 @@ class InjectOnCampusListener
     /**
      * Is user on campus or not?
      *
-     * @var boolean
+     * @var bool
      */
     protected $isOnCampus;
 
@@ -101,7 +100,7 @@ class InjectOnCampusListener
     /**
      * Determines, which value is needed for the onCampus parameter
      *
-     * @return boolean
+     * @return bool
      */
     protected function getOnCampus()
     {
@@ -126,5 +125,4 @@ class InjectOnCampusListener
 
         return $event;
     }
-
 }

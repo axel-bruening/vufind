@@ -2,7 +2,7 @@
 /**
  * Authentication view helper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Root;
-use Zend\View\Helper\Url;
+
+use Laminas\View\Helper\Url;
 
 /**
  * Authentication view helper
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
-class AlphaBrowse extends \Zend\View\Helper\AbstractHelper
+class AlphaBrowse extends \Laminas\View\Helper\AbstractHelper
 {
     /**
      * URL helper
@@ -70,19 +71,12 @@ class AlphaBrowse extends \Zend\View\Helper\AbstractHelper
             return null;
         }
 
-        // Linking using bib ids is generally more reliable than doing searches for
-        // headings, but headings give shorter queries and don't look as strange.
-        if ($item['count'] < 5) {
-            $safeIds = array_map([$this, 'escapeForSolr'], $item['ids']);
-            $query = ['type' => 'ids', 'lookfor' => implode(' ', $safeIds)];
-            if ($item['count'] == 1) {
-                $query['jumpto'] = 1;
-            }
-        } else {
-            $query = [
-                'type' => ucwords($source) . 'Browse',
-                'lookfor' => $this->escapeForSolr($item['heading']),
-            ];
+        $query = [
+            'type' => ucwords($source) . 'Browse',
+            'lookfor' => $this->escapeForSolr($item['heading']),
+        ];
+        if ($item['count'] == 1) {
+            $query['jumpto'] = 1;
         }
         return $this->url->__invoke('search-results', [], ['query' => $query]);
     }
@@ -90,7 +84,7 @@ class AlphaBrowse extends \Zend\View\Helper\AbstractHelper
     /**
      * Escape a string for inclusion in a Solr query.
      *
-     * @param type $str String to escape
+     * @param string $str String to escape
      *
      * @return string
      */

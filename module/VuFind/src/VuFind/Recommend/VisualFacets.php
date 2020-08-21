@@ -2,7 +2,7 @@
 /**
  * VisualFacets Recommendations Module
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Julia Bauder 2014.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 namespace VuFind\Recommend;
 
@@ -36,11 +36,11 @@ namespace VuFind\Recommend;
  * It must be used in combination with a template file including the necessary
  * Javascript in order to display the visualization to the user.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 class VisualFacets extends AbstractFacets
 {
@@ -66,7 +66,7 @@ class VisualFacets extends AbstractFacets
     {
         $settings = explode(':', $settings);
         $mainSection = empty($settings[0]) ? 'Visual_Settings' : $settings[0];
-        $iniName = isset($settings[1]) ? $settings[1] : 'facets';
+        $iniName = $settings[1] ?? 'facets';
 
         // Load the desired facet information:
         $config = $this->configLoader->get($iniName);
@@ -81,7 +81,7 @@ class VisualFacets extends AbstractFacets
      * be needed.
      *
      * @param \VuFind\Search\Base\Params $params  Search parameter object
-     * @param \Zend\StdLib\Parameters    $request Parameter object representing user
+     * @param \Laminas\Stdlib\Parameters $request Parameter object representing user
      * request.
      *
      * @return void

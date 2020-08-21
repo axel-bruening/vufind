@@ -2,7 +2,7 @@
 /**
  * OpenLibrarySubjects Recommendations Module
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,17 +17,19 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Eoghan Ó Carragáin <eoghan.ocarragain@gmail.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 namespace VuFind\Recommend;
-use VuFind\Connection\OpenLibrary, VuFind\Solr\Utils as SolrUtils;
+
+use VuFind\Connection\OpenLibrary;
+use VuFind\Solr\Utils as SolrUtils;
 
 /**
  * OpenLibrarySubjects Recommendations Module
@@ -35,12 +37,12 @@ use VuFind\Connection\OpenLibrary, VuFind\Solr\Utils as SolrUtils;
  * This class provides recommendations by doing a search of the catalog; useful
  * for displaying catalog recommendations in other modules (i.e. Summon, Web, etc.)
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Eoghan Ó Carragáin <eoghan.ocarragain@gmail.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 class OpenLibrarySubjects implements RecommendInterface,
     \VuFindHttp\HttpServiceAwareInterface
@@ -137,7 +139,7 @@ class OpenLibrarySubjects implements RecommendInterface,
      * be needed.
      *
      * @param \VuFind\Search\Base\Params $params  Search parameter object
-     * @param \Zend\StdLib\Parameters    $request Parameter object representing user
+     * @param \Laminas\Stdlib\Parameters $request Parameter object representing user
      * request.
      *
      * @return void
@@ -145,7 +147,7 @@ class OpenLibrarySubjects implements RecommendInterface,
     public function init($params, $request)
     {
         // Get and normalise $requestParam
-        $this->subject =  $request->get($this->requestParam);
+        $this->subject = $request->get($this->requestParam);
 
         // Set up the published date range if it has not already been provided:
         if (empty($this->publishedIn) && $this->pubFilter) {
@@ -190,8 +192,8 @@ class OpenLibrarySubjects implements RecommendInterface,
      * @param string                     $field   Name of filter field to check for
      * date limits
      * @param \VuFind\Search\Params\Base $params  Search parameter object
-     * @param \Zend\StdLib\Parameters    $request Parameter object representing user
-     * request.
+     * @param \Laminas\Stdlib\Parameters $request Parameter object representing user
+     *                                            request.
      *
      * @return string
      */
@@ -200,10 +202,10 @@ class OpenLibrarySubjects implements RecommendInterface,
         // Try to extract range details from request parameters or SearchObject:
         $from = $request->get($field . 'from');
         $to = $request->get($field . 'to');
-        if (!is_null($from) && !is_null($to)) {
+        if (null !== $from && null !== $to) {
             $range = ['from' => $from, 'to' => $to];
-        } else if (is_object($params)) {
-            $currentFilters = $params->getFilters();
+        } elseif (is_object($params)) {
+            $currentFilters = $params->getRawFilters();
             if (isset($currentFilters[$field][0])) {
                 $range = SolrUtils::parseRange($currentFilters[$field][0]);
             }

@@ -2,7 +2,7 @@
 /**
  * VTLS Virtua Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) University of Southern Queensland 2008.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Greg Pendlebury <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 namespace VuFind\ILS\Driver;
+
 use VuFind\Exception\ILS as ILSException;
 
 /**
  * VTLS Virtua Driver
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Greg Pendlebury <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterface
 {
@@ -155,7 +156,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                     ];
 
                 switch ($result[0]['CALL_NUMBER']) {
-                case 'ELECTRONIC RESOURCE' :
+                case 'ELECTRONIC RESOURCE':
                     $new_holding['availability'] = true;
                     $new_holding['status']       = null;
                     $new_holding['location']     = "Online";
@@ -163,19 +164,19 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                     $holding[] = $new_holding;
                     return $holding;
                     break;
-                case 'ON ORDER' :
+                case 'ON ORDER':
                     $new_holding['status']       = "ON ORDER";
                     $new_holding['location']     = "Pending...";
                     $holding[] = $new_holding;
                     return $holding;
                     break;
-                case 'ORDER CANCELLED' :
+                case 'ORDER CANCELLED':
                     $new_holding['status']       = "ORDER CANCELLED";
                     $new_holding['location']     = "None";
                     $holding[] = $new_holding;
                     return $holding;
                     break;
-                case 'MISSING' :
+                case 'MISSING':
                     $new_holding['status']       = "MISSING";
                     $new_holding['location']     = "Unknown";
                     $holding[] = $new_holding;
@@ -322,16 +323,19 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         // Strip off the prefix from vtls exports
         $db_id = str_replace("vtls", "", $id);
@@ -589,11 +593,9 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                         ) {
                             // ... can this user borrow on loan items at this
                             // location?
-                            if (in_array(
+                            $can_req = in_array(
                                 $location, $unavailable_locs[$item_loc_code]
-                            )) {
-                                $can_req = true;
-                            }
+                            );
                         }
                     } else {
                         // The item is NOT on loan ...
@@ -601,9 +603,8 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                         // ... and has a requestable status ...
                         if (in_array($item_stat_code, $status_list)) {
                             // ... can the user borrow status items at this location?
-                            if (in_array($location, $status_locs[$item_loc_code])) {
-                                $can_req = true;
-                            }
+                            $can_req
+                                = in_array($location, $status_locs[$item_loc_code]);
                         } else {
                             // ... and DOESN'T have a requestable status ...
                             if ($item_stat_code !== null) {
@@ -611,11 +612,9 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                             } else {
                                 // ... can the user borrow available items at this
                                 // location?
-                                if (in_array(
+                                $can_req = in_array(
                                     $location, $available_locs[$item_loc_code]
-                                )) {
-                                    $can_req = true;
-                                }
+                                );
                             }
                         }
                     }
@@ -723,7 +722,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                     $end_time = strtotime("01-" . $months[1] . "-" . $years[0]);
                     break;
                 // January 2000
-                case "11";
+                case "11":
                     $start_string = "F Y";
                     $end_time = null;
                     break;
@@ -990,7 +989,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
                     $tag  = $subfield['tag'];
                     $sort = explode('.', $subfield['data']);
                     $sort_rule  = $sort[0];
-                    $sort_order = isset($sort[1]) ? $sort[1] : 0;
+                    $sort_order = $sort[1] ?? 0;
                     $sort_order = sprintf("%05d", $sort_order);
                 } else {
                     // Everything else goes in the data bucket
@@ -1244,7 +1243,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return mixed        Array of the patron's fines on success.
      */
@@ -1285,7 +1284,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's holds on success.
      */
@@ -1324,7 +1323,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's transactions on success.
      */
@@ -1764,24 +1763,24 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
 
         // Have to use raw post data because of the way
         //   virtua expects the barcodes to come across.
-        $post_data  = "function="      . "RENEWAL";
-        $post_data .= "&search="       . "PATRON";
-        $post_data .= "&sessionid="    . "$session_id";
-        $post_data .= "&skin="         . "homepage";
-        $post_data .= "&lng="          . $this->getConfiguredLanguage();
-        $post_data .= "&inst="         . "consortium";
-        $post_data .= "&conf="         . urlencode(".&#047;chameleon.conf");
-        $post_data .= "&u1="           . "12";
+        $post_data  = "function=" . "RENEWAL";
+        $post_data .= "&search=" . "PATRON";
+        $post_data .= "&sessionid=" . "$session_id";
+        $post_data .= "&skin=" . "homepage";
+        $post_data .= "&lng=" . $this->getConfiguredLanguage();
+        $post_data .= "&inst=" . "consortium";
+        $post_data .= "&conf=" . urlencode(".&#047;chameleon.conf");
+        $post_data .= "&u1=" . "12";
         $post_data .= "&SourceScreen=" . "PATRONACTIVITY";
-        $post_data .= "&pos="          . "1";
-        $post_data .= "&patronid="     . $patron['cat_username'];
+        $post_data .= "&pos=" . "1";
+        $post_data .= "&patronid=" . $patron['cat_username'];
         $post_data .= "&patronhost="
             . urlencode($this->config['Catalog']['patron_host']);
         $post_data .= "&host="
             . urlencode($this->config['Catalog']['host_string']);
-        $post_data .= "&itembarcode="  . implode("&itembarcode=", $item_list);
-        $post_data .= "&submit="       . "Renew";
-        $post_data .= "&reset="        . "Clear";
+        $post_data .= "&itembarcode=" . implode("&itembarcode=", $item_list);
+        $post_data .= "&submit=" . "Renew";
+        $post_data .= "&reset=" . "Clear";
 
         $result = $this->httpRequest($virtua_url, null, $post_data);
 
@@ -1832,7 +1831,7 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
         }
 
         foreach ($result as $row) {
-            $list[] = 'vtls' .  str_pad($row['AUTH_ID'], 9, "0", STR_PAD_LEFT);
+            $list[] = 'vtls' . str_pad($row['AUTH_ID'], 9, "0", STR_PAD_LEFT);
         }
         return $list;
     }
@@ -1878,14 +1877,14 @@ class Virtua extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterfa
      */
     protected function httpRequest($url, $postParams = null, $rawPost = null)
     {
-        $method = (is_null($postParams) && is_null($rawPost)) ? 'GET' : 'POST';
+        $method = (null === $postParams && null === $rawPost) ? 'GET' : 'POST';
 
         try {
             $client = $this->httpService->createClient($url);
             if (is_array($postParams)) {
                 $client->setParameterPost($postParams);
             }
-            if (!is_null($rawPost)) {
+            if (null !== $rawPost) {
                 $client->setRawBody($rawPost);
                 $client->setEncType('application/x-www-form-urlencoded');
             }

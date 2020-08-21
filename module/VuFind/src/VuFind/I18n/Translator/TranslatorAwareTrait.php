@@ -2,7 +2,7 @@
 /**
  * Lightweight translator aware marker interface.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,35 +17,36 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\I18n\Translator;
-use Zend\I18n\Translator\TranslatorInterface;
+
+use Laminas\I18n\Translator\TranslatorInterface;
 
 /**
  * Lightweight translator aware marker interface (used as an alternative to
- * \Zend\I18n\Translator\TranslatorAwareInterface, which requires an excessive
+ * \Laminas\I18n\Translator\TranslatorAwareInterface, which requires an excessive
  * number of methods to be implemented).  If we switch to PHP 5.4 traits in the
- * future, we can eliminate this interface in favor of the default Zend version.
+ * future, we can eliminate this interface in favor of the default Laminas version.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 trait TranslatorAwareTrait
 {
     /**
      * Translator
      *
-     * @var \Zend\I18n\Translator\TranslatorInterface
+     * @var \Laminas\I18n\Translator\TranslatorInterface
      */
     protected $translator = null;
 
@@ -65,7 +66,7 @@ trait TranslatorAwareTrait
     /**
      * Get translator object.
      *
-     * @return \Zend\I18n\Translator\TranslatorInterface
+     * @return \Laminas\I18n\Translator\TranslatorInterface
      */
     public function getTranslator()
     {
@@ -105,6 +106,9 @@ trait TranslatorAwareTrait
 
         // Special case: deal with objects with a designated display value:
         if ($str instanceof \VuFind\I18n\TranslatableStringInterface) {
+            if (!$str->isTranslatable()) {
+                return $str->getDisplayString();
+            }
             // On this pass, don't use the $default, since we want to fail over
             // to getDisplayString before giving up:
             $translated = $this
@@ -113,11 +117,47 @@ trait TranslatorAwareTrait
                 return $translated;
             }
             // Override $domain/$str using getDisplayString() before proceeding:
-            list($domain, $str) = $this->extractTextDomain($str->getDisplayString());
+            $str = $str->getDisplayString();
+            // Also the display string can be a TranslatableString. This makes it
+            // possible have multiple levels of translatable values while still
+            // providing a sane default string if translation is not found. Used at
+            // least with hierarchical facets where translation key can be the exact
+            // facet value (e.g. "0/Book/") or a displayable value (e.g. "Book").
+            if ($str instanceof \VuFind\I18n\TranslatableStringInterface) {
+                return $this->translate($str, $tokens, $default);
+            } else {
+                list($domain, $str) = $this->extractTextDomain($str);
+            }
         }
 
         // Default case: deal with ordinary strings (or string-castable objects):
         return $this->translateString((string)$str, $tokens, $default, $domain);
+    }
+
+    /**
+     * Translate a string (or string-castable object) using a prefix, or without the
+     * prefix if a prefixed translation is not found.
+     *
+     * @param string              $prefix  Translation key prefix
+     * @param string|object|array $target  String to translate or an array of text
+     * domain and string to translate
+     * @param array               $tokens  Tokens to inject into the translated
+     * string
+     * @param string              $default Default value to use if no translation is
+     * found (null for no default).
+     *
+     * @return string
+     */
+    public function translateWithPrefix($prefix, $target, $tokens = [],
+        $default = null
+    ) {
+        if (is_string($target)) {
+            if (null === $default) {
+                $default = $target;
+            }
+            $target = $prefix . $target;
+        }
+        return $this->translate($target, $tokens, $default);
     }
 
     /**
@@ -134,13 +174,13 @@ trait TranslatorAwareTrait
     protected function translateString($str, $tokens = [], $default = null,
         $domain = 'default'
     ) {
-
         $msg = (null === $this->translator)
             ? $str : $this->translator->translate($str, $domain);
 
         // Did the translation fail to change anything?  If so, use default:
         if (null !== $default && $msg == $str) {
-            $msg = $default;
+            $msg = $default instanceof \VuFind\I18n\TranslatableStringInterface
+                ? $default->getDisplayString() : $default;
         }
 
         // Do we need to perform substitutions?
@@ -167,7 +207,7 @@ trait TranslatorAwareTrait
      */
     protected function extractTextDomain($target)
     {
-        $parts = is_array($target) ? $target : explode('::', $target);
+        $parts = is_array($target) ? $target : explode('::', $target, 2);
         if (count($parts) < 1 || count($parts) > 2) {
             throw new \Exception('Unexpected value sent to translator!');
         }
@@ -177,7 +217,9 @@ trait TranslatorAwareTrait
             }
             if ($target instanceof \VuFind\I18n\TranslatableStringInterface) {
                 $class = get_class($target);
-                $parts[1] = new $class($parts[1], $target->getDisplayString());
+                $parts[1] = new $class(
+                    $parts[1], $target->getDisplayString(), $target->isTranslatable()
+                );
             }
             return $parts;
         }

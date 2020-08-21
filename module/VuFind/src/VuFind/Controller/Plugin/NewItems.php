@@ -2,7 +2,7 @@
 /**
  * VuFind Action Helper - New Items Support Methods
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller_Plugins
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Controller\Plugin;
-use Zend\Mvc\Controller\Plugin\AbstractPlugin, Zend\Config\Config;
+
+use Laminas\Config\Config;
+use Laminas\Mvc\Controller\Plugin\AbstractPlugin;
+use Laminas\Mvc\Plugin\FlashMessenger\FlashMessenger;
 
 /**
- * Zend action helper to perform new items-related actions
+ * Action helper to perform new items-related actions
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller_Plugins
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class NewItems extends AbstractPlugin
 {
@@ -59,11 +62,11 @@ class NewItems extends AbstractPlugin
     /**
      * Figure out which bib IDs to load from the ILS.
      *
-     * @param \VuFind\ILS\Connection                     $catalog ILS connection
-     * @param \VuFind\Search\Solr\Params                 $params  Solr parameters
-     * @param string                                     $range   Range setting
-     * @param string                                     $dept    Department setting
-     * @param \Zend\Mvc\Controller\Plugin\FlashMessenger $flash   Flash messenger
+     * @param \VuFind\ILS\Connection     $catalog ILS connection
+     * @param \VuFind\Search\Solr\Params $params  Solr parameters
+     * @param string                     $range   Range setting
+     * @param string                     $dept    Department setting
+     * @param FlashMessenger             $flash   Flash messenger
      *
      * @return array
      */

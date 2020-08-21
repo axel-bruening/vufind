@@ -2,7 +2,7 @@
 /**
  * CitationBuilder Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,30 +17,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\View\Helper\Root;
+
 use VuFind\View\Helper\Root\Citation;
 
 /**
  * CitationBuilder Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class CitationTest extends \VuFindTest\Unit\ViewHelperTestCase
 {
     /**
- * Sample citations -- each element of this array contains three elements --
+     * Sample citations -- each element of this array contains three elements --
      * the raw input data and the expected apa/mla output citations.
      *
      * @var array
@@ -308,26 +309,6 @@ class CitationTest extends \VuFindTest\Unit\ViewHelperTestCase
         ]
         // @codingStandardsIgnoreEnd
     ];
-
-    /**
-     * Setup test case.
-     *
-     * Mark test skipped if short_open_tag is not enabled. The partial
-     * uses short open tags. This directive is PHP_INI_PERDIR,
-     * i.e. can only be changed via php.ini or a per-directory
-     * equivalent. The testCitations() will fail if the test is run on
-     * a system with short_open_tag disabled in the system-wide php
-     * ini-file.
-     *
-     * @return void
-     */
-    protected function setup()
-    {
-        parent::setup();
-        if (!ini_get('short_open_tag')) {
-            $this->markTestSkipped('Test requires short_open_tag to be enabled');
-        }
-    }
 
     /**
      * Test citation generation

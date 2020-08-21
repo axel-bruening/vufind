@@ -2,7 +2,7 @@
 /**
  * MultiAuth Authentication plugin
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,17 +17,19 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Anna Headley <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 namespace VuFind\Auth;
-use VuFind\Db\Row\User, VuFind\Exception\Auth as AuthException;
-use Zend\Http\PhpEnvironment\Request;
+
+use Laminas\Http\PhpEnvironment\Request;
+use VuFind\Db\Row\User;
+use VuFind\Exception\Auth as AuthException;
 
 /**
  * ChoiceAuth Authentication plugin
@@ -37,11 +39,11 @@ use Zend\Http\PhpEnvironment\Request;
  *
  * See config.ini for more details
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Anna Headley <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 class ChoiceAuth extends AbstractBase
 {
@@ -69,17 +71,20 @@ class ChoiceAuth extends AbstractBase
     /**
      * Session container
      *
-     * @var \Zend\Session\Container
+     * @var \Laminas\Session\Container
      */
     protected $session;
 
     /**
      * Constructor
+     *
+     * @param \Laminas\Session\Container $container Session container for retaining
+     * user choices.
      */
-    public function __construct()
+    public function __construct(\Laminas\Session\Container $container)
     {
         // Set up session container and load cached strategy (if found):
-        $this->session = new \Zend\Session\Container('ChoiceAuth');
+        $this->session = $container;
         $this->strategy = isset($this->session->auth_method)
             ? $this->session->auth_method : false;
     }
@@ -107,7 +112,7 @@ class ChoiceAuth extends AbstractBase
     /**
      * Set configuration; throw an exception if it is invalid.
      *
-     * @param \Zend\Config\Config $config Configuration to set
+     * @param \Laminas\Config\Config $config Configuration to set
      *
      * @throws AuthException
      * @return void
@@ -118,6 +123,32 @@ class ChoiceAuth extends AbstractBase
         $this->strategies = array_map(
             'trim', explode(',', $this->getConfig()->ChoiceAuth->choice_order)
         );
+    }
+
+    /**
+     * Inspect the user's request prior to processing a login request; this is
+     * essentially an event hook which most auth modules can ignore. See
+     * ChoiceAuth for a use case example.
+     *
+     * @param Request $request Request object.
+     *
+     * @throws AuthException
+     * @return void
+     */
+    public function preLoginCheck($request)
+    {
+        $this->setStrategyFromRequest($request);
+    }
+
+    /**
+     * Reset any internal status; this is essentially an event hook which most auth
+     * modules can ignore. See ChoiceAuth for a use case example.
+     *
+     * @return void
+     */
+    public function resetState()
+    {
+        $this->strategy = false;
     }
 
     /**
@@ -293,6 +324,34 @@ class ChoiceAuth extends AbstractBase
     }
 
     /**
+     * Returns any authentication method this request should be delegated to.
+     *
+     * @param Request $request Request object.
+     *
+     * @return string|bool
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function getDelegateAuthMethod(Request $request)
+    {
+        return $this->proxyAuthMethod('getDelegateAuthMethod', func_get_args());
+    }
+
+    /**
+     * Is the configured strategy on the list of legal options?
+     *
+     * @return bool
+     */
+    protected function hasLegalStrategy()
+    {
+        // Do a case-insensitive search of the strategy list:
+        return in_array(
+            strtolower($this->strategy),
+            array_map('strtolower', $this->strategies)
+        );
+    }
+
+    /**
      * Proxy auth method; a helper function to be called like:
      *   return $this->proxyAuthMethod(METHOD, func_get_args());
      *
@@ -309,7 +368,7 @@ class ChoiceAuth extends AbstractBase
             return false;
         }
 
-        if (!in_array($this->strategy, $this->strategies)) {
+        if (!$this->hasLegalStrategy()) {
             throw new InvalidArgumentException("Illegal setting: {$this->strategy}");
         }
         $authenticator = $this->getPluginManager()->get($this->strategy);
@@ -371,8 +430,7 @@ class ChoiceAuth extends AbstractBase
      * of the current logged-in user. Return true for valid credentials, false
      * otherwise.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
-     * account credentials.
+     * @param Request $request Request object containing account credentials.
      *
      * @throws AuthException
      * @return bool
@@ -388,5 +446,22 @@ class ChoiceAuth extends AbstractBase
             return false;
         }
         return isset($user) && $user instanceof User;
+    }
+
+    /**
+     * Whether this authentication method needs CSRF checking for the request.
+     *
+     * @param Request $request Request object.
+     *
+     * @return bool
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function needsCsrfCheck($request)
+    {
+        if (!$this->strategy) {
+            return true;
+        }
+        return $this->proxyAuthMethod('needsCsrfCheck', func_get_args());
     }
 }

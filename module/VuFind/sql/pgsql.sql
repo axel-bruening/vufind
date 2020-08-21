@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS "comments";
 
 CREATE TABLE comments (
 id SERIAL,
-user_id int NOT NULL DEFAULT '0',
+user_id int DEFAULT NULL,
 resource_id int NOT NULL DEFAULT '0',
 comment text NOT NULL,
 created timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
@@ -22,13 +22,16 @@ CREATE INDEX comments_resource_id_idx ON comments (resource_id);
 -- Table structure for table resource
 --
 
+DROP TABLE IF EXISTS "resource";
+
 CREATE TABLE resource (
 id SERIAL,
-record_id varchar(120) NOT NULL DEFAULT '',
-title varchar(200) NOT NULL DEFAULT '',
-author varchar(200) DEFAULT NULL,
+record_id varchar(255) NOT NULL DEFAULT '',
+title varchar(255) NOT NULL DEFAULT '',
+author varchar(255) DEFAULT NULL,
 year int DEFAULT NULL,
-source varchar(50) NOT NULL DEFAULT 'VuFind',
+source varchar(50) NOT NULL DEFAULT 'Solr',
+extra_metadata text DEFAULT NULL,
 PRIMARY KEY (id)
 );
 CREATE INDEX resource_record_id_idx ON resource (record_id);
@@ -40,9 +43,11 @@ CREATE INDEX resource_record_id_idx ON resource (record_id);
 -- Table structure for table resource_tags
 --
 
+DROP TABLE IF EXISTS "resource_tags";
+
 CREATE TABLE resource_tags (
 id SERIAL,
-resource_id int NOT NULL DEFAULT '0',
+resource_id int DEFAULT NULL,
 tag_id int NOT NULL DEFAULT '0',
 list_id int DEFAULT NULL,
 user_id int DEFAULT NULL,
@@ -61,27 +66,53 @@ CREATE INDEX resource_tags_list_id_idx ON resource_tags (list_id);
 -- Table structure for table search. Than fixed created column default value. Old value is 0000-00-00.
 --
 
+DROP TABLE IF EXISTS "search";
+
 CREATE TABLE search (
-id SERIAL,
+id BIGSERIAL,
 user_id int NOT NULL DEFAULT '0',
 session_id varchar(128),
 folder_id int DEFAULT NULL,
-created date NOT NULL DEFAULT '1970-01-01',
+created timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
 title varchar(20) DEFAULT NULL,
 saved int NOT NULL DEFAULT '0',
 search_object bytea,
+checksum int DEFAULT NULL,
+notification_frequency int NOT NULL DEFAULT '0',
+last_notification_sent timestamp NOT NULL DEFAULT '2000-01-01 00:00:00',
+notification_base_url varchar(255) NOT NULL DEFAULT '',
 PRIMARY KEY (id)
 );
 CREATE INDEX search_user_id_idx ON search (user_id);
 CREATE INDEX search_folder_id_idx ON search (folder_id);
 CREATE INDEX session_id_idx ON search (session_id);
+CREATE INDEX notification_frequency_idx ON search (notification_frequency);
+CREATE INDEX notification_base_url_idx ON search (notification_base_url);
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table shortlinks
+--
+
+DROP TABLE IF EXISTS "shortlinks";
+
+CREATE TABLE shortlinks (
+id SERIAL,
+path text,
+hash varchar(32),
+created timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX shortlinks_hash_idx ON shortlinks (hash);
 
 -- --------------------------------------------------------
 
 --
 -- Table structure for table tags
 --
+
+DROP TABLE IF EXISTS "tags";
 
 CREATE TABLE tags (
 id SERIAL,
@@ -95,6 +126,8 @@ PRIMARY KEY (id)
 -- Table structure for table user
 --
 
+DROP TABLE IF EXISTS "user";
+
 CREATE TABLE "user"(
 id SERIAL,
 username varchar(255) NOT NULL DEFAULT '',
@@ -103,16 +136,24 @@ pass_hash varchar(60) DEFAULT NULL,
 firstname varchar(50) NOT NULL DEFAULT '',
 lastname varchar(50) NOT NULL DEFAULT '',
 email varchar(255) NOT NULL DEFAULT '',
+email_verified timestamp DEFAULT NULL,
+pending_email varchar(255) NOT NULL DEFAULT '',
+user_provided_email boolean NOT NULL DEFAULT '0',
+cat_id varchar(255) DEFAULT NULL,
 cat_username varchar(50) DEFAULT NULL,
-cat_password varchar(50) DEFAULT NULL,
-cat_pass_enc varchar(110) DEFAULT NULL,
+cat_password varchar(70) DEFAULT NULL,
+cat_pass_enc varchar(170) DEFAULT NULL,
 college varchar(100) NOT NULL DEFAULT '',
 major varchar(100) NOT NULL DEFAULT '',
 home_library varchar(100) NOT NULL DEFAULT '',
 created timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
 verify_hash varchar(42) NOT NULL DEFAULT '',
+last_login timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
+auth_method varchar(50) DEFAULT NULL,
+last_language varchar(30) NOT NULL DEFAULT '',
 PRIMARY KEY (id),
-UNIQUE (username)
+UNIQUE (username),
+UNIQUE (cat_id)
 );
 
 
@@ -121,6 +162,8 @@ UNIQUE (username)
 --
 -- Table structure for table user_list
 --
+
+DROP TABLE IF EXISTS "user_list";
 
 CREATE TABLE user_list (
 id SERIAL,
@@ -139,6 +182,8 @@ CREATE INDEX user_list_user_id_idx ON user_list (user_id);
 --
 -- Table structure for table user_resource
 --
+
+DROP TABLE IF EXISTS "user_resource";
 
 CREATE TABLE user_resource (
 id SERIAL,
@@ -163,7 +208,7 @@ CREATE INDEX user_resource_list_id_idx ON user_resource (list_id);
 DROP TABLE IF EXISTS "session";
 
 CREATE TABLE session (
-id SERIAL,
+id BIGSERIAL,
 session_id varchar(128),
 data text,
 last_used int NOT NULL default 0,
@@ -174,7 +219,23 @@ UNIQUE (session_id)
 CREATE INDEX last_used_idx on session(last_used);
 
 --
--- Table structure for table `change_tracker`
+-- Table structure for table external_session
+--
+
+DROP TABLE IF EXISTS "external_session";
+
+CREATE TABLE external_session (
+id BIGSERIAL,
+session_id varchar(128) NOT NULL,
+external_session_id varchar(255) NOT NULL,
+created timestamp NOT NULL default '1970-01-01 00:00:00',
+PRIMARY KEY (id),
+UNIQUE (session_id)
+);
+CREATE INDEX external_session_id on external_session(external_session_id);
+
+--
+-- Table structure for table change_tracker
 --
 
 DROP TABLE IF EXISTS "change_tracker";
@@ -191,7 +252,7 @@ PRIMARY KEY (core, id)
 CREATE INDEX change_tracker_deleted_idx on change_tracker(deleted);
 
 --
--- Table structure for table `oai_resumption`
+-- Table structure for table oai_resumption
 --
 
 DROP TABLE IF EXISTS "oai_resumption";
@@ -206,51 +267,31 @@ PRIMARY KEY (id)
 -- --------------------------------------------------------
 
 --
--- Statistics tables
+-- Table structure for table record
 --
 
---
--- Table structure for table `statistics`
---
+DROP TABLE IF EXISTS "record";
 
-DROP TABLE IF EXISTS "user_stats_fields";
-
-CREATE TABLE user_stats_fields (
-id varchar(24) NOT NULL,
-field varchar(32) NOT NULL,
-value varchar(1024) NOT NULL,
-PRIMARY KEY (id, field)
+CREATE TABLE record (
+  id serial NOT NULL,
+  record_id varchar(255),
+  source varchar(50),
+  version varchar(20) NOT NULL,
+  data text,
+  updated timestamp without time zone,
+  PRIMARY KEY (id),
+  UNIQUE(record_id, source)
 );
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `user_stats`
---
-
-DROP TABLE IF EXISTS "user_stats";
-
-CREATE TABLE user_stats (
-id varchar(24) NOT NULL,
-datestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-browser varchar(32) NOT NULL,
-browserVersion varchar(8) NOT NULL,
-ipaddress varchar(15) NOT NULL,
-referrer varchar(512) NOT NULL,
-url varchar(512) NOT NULL,
-session varchar(64) NOT NULL,
-PRIMARY KEY (id)
-);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `user_card`
+-- Table structure for table user_card
 --
 
 DROP TABLE IF EXISTS "user_card";
 
-CREATE TABLE `user_card` (
+CREATE TABLE user_card (
 id SERIAL,
 user_id int NOT NULL,
 card_name varchar(255) NOT NULL DEFAULT '',
@@ -266,6 +307,24 @@ CONSTRAINT user_card_ibfk_1 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELE
 CREATE INDEX user_card_cat_username_idx ON user_card (cat_username);
 CREATE INDEX user_card_user_id_idx ON user_card (user_id);
 
+--
+-- Table structure for table auth_hash
+--
+
+DROP TABLE IF EXISTS "auth_hash";
+
+CREATE TABLE auth_hash (
+id BIGSERIAL,
+session_id varchar(128),
+hash varchar(255),
+type varchar(50),
+data text,
+created timestamp NOT NULL default '1970-01-01 00:00:00',
+PRIMARY KEY (id),
+UNIQUE (hash, type)
+);
+CREATE INDEX auth_hash_created_idx on auth_hash(created);
+
 -- --------------------------------------------------------
 
 --
@@ -276,7 +335,7 @@ CREATE INDEX user_card_user_id_idx ON user_card (user_id);
 -- Constraints for table comments
 --
 ALTER TABLE comments
-ADD CONSTRAINT comments_ibfk_1 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE,
+ADD CONSTRAINT comments_ibfk_1 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE SET NULL,
 ADD CONSTRAINT comments_ibfk_2 FOREIGN KEY (resource_id) REFERENCES resource (id) ON DELETE CASCADE;
 
 

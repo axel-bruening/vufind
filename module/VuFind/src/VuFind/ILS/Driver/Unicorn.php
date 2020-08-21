@@ -2,7 +2,7 @@
 /**
  * SirsiDynix Unicorn ILS Driver (VuFind side)
  *
- * PHP version 5
+ * PHP version 7
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -15,9 +15,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Tuan Nguyen <tuan@yorku.ca>
  * @author   Drew Farrugia <vufind-unicorn-l@lists.lehigh.edu>
@@ -25,7 +25,9 @@
  * @link     http://code.google.com/p/vufind-unicorn/ vufind-unicorn project
  */
 namespace VuFind\ILS\Driver;
-use File_MARC, VuFind\Exception\ILS as ILSException;
+
+use File_MARC;
+use VuFind\Exception\ILS as ILSException;
 
 /**
  * SirsiDynix Unicorn ILS Driver (VuFind side)
@@ -35,7 +37,7 @@ use File_MARC, VuFind\Exception\ILS as ILSException;
  * Unicorn/Symphony server. Please note: currently you will need to download
  * the driver.pl in the yorku branch on google code to use this driver.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Tuan Nguyen <tuan@yorku.ca>
  * @author   Drew Farrugia <vufind-unicorn-l@lists.lehigh.edu>
@@ -317,14 +319,13 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
 
         if (!empty($items)) {
             // sort the items by shelving key in descending order, then ascending by
-            // copy number; use create_function to create anonymous comparison
-            // function for php 5.2 compatibility
-            $cmp = create_function(
-                '$a,$b',
-                'if ($a["shelving_key"] == $b["shelving_key"]) '
-                .     'return $a["number"] - $b["number"];'
-                . 'return $a["shelving_key"] < $b["shelving_key"] ? 1 : -1;'
-            );
+            // copy number
+            $cmp = function ($a, $b) {
+                if ($a['shelving_key'] == $b['shelving_key']) {
+                    return $a['number'] - $b['number'];
+                }
+                return $a['shelving_key'] < $b['shelving_key'] ? 1 : -1;
+            };
             usort($items, $cmp);
         }
         return $items;
@@ -392,16 +393,19 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         return $this->getStatus($id);
     }
@@ -574,7 +578,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return mixed        Array of the patron's fines on success.
      */
@@ -632,7 +636,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's holds on success.
      */
@@ -759,7 +763,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's transactions on success.
      */
@@ -817,14 +821,12 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
 
         if (!empty($items)) {
             // sort the items by due date
-            // use create_function to create anonymous comparison
-            // function for php 5.2 compatibility
-            $cmp = create_function(
-                '$a,$b',
-                'if ($a["duedate_raw"] == $b["duedate_raw"]) '
-                . 'return $a["id"] < $b["id"] ? -1 : 1;'
-                . 'return $a["duedate_raw"] < $b["duedate_raw"] ? -1 : 1;'
-            );
+            $cmp = function ($a, $b) {
+                if ($a['duedate_raw'] == $b['duedate_raw']) {
+                    return $a['id'] < $b['id'] ? -1 : 1;
+                }
+                return $a['duedate_raw'] < $b['duedate_raw'] ? -1 : 1;
+            };
             usort($items, $cmp);
         }
 
@@ -1081,7 +1083,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
         ) {
             $availability = 0;
             $status = $this->config['UnavailableItemTypes'][$item_type];
-        } else if (isset($this->config['UnavailableLocations'])
+        } elseif (isset($this->config['UnavailableLocations'])
             && isset($this->config['UnavailableLocations'][$currLocCode])
         ) {
             $availability = 0;
@@ -1117,7 +1119,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
             'format' => $format
             ];
 
-            return $item;
+        return $item;
     }
 
     /**
@@ -1177,10 +1179,10 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
         if (empty($url)) {
             $url = $this->host;
             if ($this->port) {
-                $url =  "http://" . $url . ":" . $this->port . "/" .
+                $url = "http://" . $url . ":" . $this->port . "/" .
                     $this->search_prog;
             } else {
-                $url =  "http://" . $url . "/" . $this->search_prog;
+                $url = "http://" . $url . "/" . $this->search_prog;
             }
         }
 
@@ -1281,7 +1283,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
     /**
      * Given a location field, return the values relevant to VuFind.
      *
-     * This method is meant to be overriden in inheriting classes to
+     * This method is meant to be overridden in inheriting classes to
      * reflect local policies regarding interpretation of the a, b and
      * c subfields of  852.
      *
@@ -1381,7 +1383,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
             }
             $linking = $linking[0];
 
-            if (array_key_exists((int) $linking, $textuals)) {
+            if (array_key_exists((int)$linking, $textuals)) {
                 // Skip coded holdings overridden by textual
                 // holdings
                 continue;
@@ -1395,7 +1397,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
                 $decoded_holding .= ' ' . $subfield->getData();
             }
 
-            $ndx = (int) ($linking
+            $ndx = (int)($linking
                           . sprintf("%0{$link_digits}u", $sequence));
             $holdings[$ndx] = trim($decoded_holding);
         }
@@ -1406,7 +1408,7 @@ class Unicorn extends AbstractBase implements \VuFindHttp\HttpServiceAwareInterf
                 $textual_holding .= ' ' . $note->getData();
             }
 
-            $ndx = (int) ($linking . sprintf("%0{$link_digits}u", 0));
+            $ndx = (int)($linking . sprintf("%0{$link_digits}u", 0));
             $holdings[$ndx] = trim($textual_holding);
         }
 

@@ -2,7 +2,7 @@
 /**
  * Symphony Web Services (symws) ILS Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -17,36 +17,38 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Steven Hild <sjhild@wm.edu>
  * @author   Michael Gillen <mlgillen@sfasu.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 namespace VuFind\ILS\Driver;
-use SoapClient, SoapFault, SoapHeader, VuFind\Exception\ILS as ILSException,
-    Zend\ServiceManager\ServiceLocatorAwareInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
-use Zend\Log\LoggerAwareInterface;
+
+use Laminas\Log\LoggerAwareInterface;
+use SoapClient;
+use SoapFault;
+use SoapHeader;
+use VuFind\Cache\Manager as CacheManager;
+use VuFind\Exception\ILS as ILSException;
+use VuFind\Record\Loader;
 
 /**
  * Symphony Web Services (symws) ILS Driver
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Steven Hild <sjhild@wm.edu>
  * @author   Michael Gillen <mlgillen@sfasu.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
-class Symphony extends AbstractBase
-    implements ServiceLocatorAwareInterface, LoggerAwareInterface
+class Symphony extends AbstractBase implements LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
-    use \Zend\ServiceManager\ServiceLocatorAwareTrait;
 
     /**
      * Cache for policy information
@@ -61,6 +63,32 @@ class Symphony extends AbstractBase
      * @var array
      */
     protected $policies;
+
+    /**
+     * Cache manager
+     *
+     * @var CacheManager
+     */
+    protected $cacheManager;
+
+    /**
+     * Record loader
+     *
+     * @var Loader
+     */
+    protected $recordLoader;
+
+    /**
+     * Constructor
+     *
+     * @param Loader       $loader       Record loader
+     * @param CacheManager $cacheManager Cache manager (optional)
+     */
+    public function __construct(Loader $loader, CacheManager $cacheManager = null)
+    {
+        $this->recordLoader = $loader;
+        $this->cacheManager = $cacheManager;
+    }
 
     /**
      * Initialize the driver.
@@ -120,13 +148,11 @@ class Symphony extends AbstractBase
         ];
 
         // Initialize cache manager.
-        if (isset($configArray['PolicyCache']['type'])) {
-            $serviceManager = $this->getServiceLocator()->getServiceLocator();
-            if ($serviceManager->has('VuFind\CacheManager')) {
-                $manager = $serviceManager->get('VuFind\CacheManager');
-                $this->policyCache
-                    = $manager->getCache($configArray['PolicyCache']['type']);
-            }
+        if (isset($configArray['PolicyCache']['type'])
+            && $this->cacheManager
+        ) {
+            $this->policyCache = $this->cacheManager
+                ->getCache($configArray['PolicyCache']['type']);
         }
     }
 
@@ -181,7 +207,7 @@ class Symphony extends AbstractBase
         $reset = false
     ) {
         $data = ['clientID' => $this->config['WebServices']['clientID']];
-        if (!is_null($login)) {
+        if (null !== $login) {
             $data['sessionToken']
                 = $this->getSessionToken($login, $password, $reset);
         }
@@ -244,13 +270,10 @@ class Symphony extends AbstractBase
      * @param string $operation  the SymWS operation name
      * @param array  $parameters the request parameters for the operation
      * @param array  $options    An associative array of additional options:
-     *                           - 'login': login to use for the operation;
-     *                                      omit for configured default
-     *                                      credentials or anonymous
-     *                           - 'password': password associated with login;
-     *                                         omit for no password
-     *                           - 'header': SoapHeader to use for the request;
-     *                                       omit to handle automatically
+     * - 'login': login to use for the operation; omit for configured default
+     * credentials or anonymous
+     * - 'password': password associated with login; omit for no password
+     * - 'header': SoapHeader to use for the request; omit to handle automatically
      *
      * @return mixed the result of the SOAP call
      */
@@ -276,9 +299,7 @@ class Symphony extends AbstractBase
          */
         if (isset($options['login'])) {
             $login    = $options['login'];
-            $password = isset($options['password'])
-                ? $options['password']
-                : null;
+            $password = $options['password'] ?? null;
         } elseif (isset($options['WebServices']['login'])
             && !in_array(
                 $operation,
@@ -375,8 +396,7 @@ class Symphony extends AbstractBase
 
         $entryNumber = $this->config['999Holdings']['entry_number'];
 
-        $records = $this->getServiceLocator()->getServiceLocator()
-            ->get('VuFind\RecordLoader')->loadBatch($ids);
+        $records = $this->recordLoader->loadBatch($ids);
         foreach ($records as $record) {
             $results = $record->getFormattedMarcDetails($entryNumber, $marcMap);
             foreach ($results as $result) {
@@ -480,14 +500,14 @@ class Symphony extends AbstractBase
      */
     protected function libraryIsFilteredOut($libraryID)
     {
-        $notInWhitelist = !empty($this->config['LibraryFilter']['include_only'])
+        $notIncluded = !empty($this->config['LibraryFilter']['include_only'])
             && !in_array(
                 $libraryID, $this->config['LibraryFilter']['include_only']
             );
-        $onBlacklist = in_array(
+        $excluded = in_array(
             $libraryID, $this->config['LibraryFilter']['exclude']
         );
-        return $notInWhitelist || $onBlacklist;
+        return $notIncluded || $excluded;
     }
 
     /**
@@ -521,9 +541,9 @@ class Symphony extends AbstractBase
             }
 
             $library = $this->translatePolicyID('LIBR', $libraryID);
-            $copyNumber = 0; // ItemInfo does not include copy numbers,
-                             // so we generate them under the assumption
-                             // that items are being listed in order.
+            // ItemInfo does not include copy numbers, so we generate them under
+            // the assumption that items are being listed in order.
+            $copyNumber = 0;
 
             $itemInfos = is_array($callInfo->ItemInfo)
                 ? $callInfo->ItemInfo
@@ -753,7 +773,7 @@ class Symphony extends AbstractBase
             $library_id = $titleOrderInfo->orderLibraryID;
 
             /* Allow returned holdings information to be
-             * limited to a whitelist of library names. */
+             * limited to a specified list of library names. */
             if (isset($this->config['holdings']['include_libraries'])
                 && !in_array(
                     $library_id,
@@ -953,8 +973,7 @@ class Symphony extends AbstractBase
         $policyID   = strtoupper($policyID);
         $policyList = $this->getPolicyList($policyType);
 
-        return isset($policyList[$policyID]) ?
-            $policyList[$policyID] : $policyID;
+        return $policyList[$policyID] ?? $policyID;
     }
 
     /**
@@ -972,7 +991,7 @@ class Symphony extends AbstractBase
     public function getStatus($id)
     {
         $statuses = $this->getStatuses([$id]);
-        return isset($statuses[$id]) ? $statuses[$id] : [];
+        return $statuses[$id] ?? [];
     }
 
     /**
@@ -1001,15 +1020,18 @@ class Symphony extends AbstractBase
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         return $this->getStatus($id);
     }
@@ -1030,7 +1052,7 @@ class Symphony extends AbstractBase
         return [];
     }
 
-     /**
+    /**
      * Patron Login
      *
      * This is responsible for authenticating a patron against the catalog.
@@ -1105,7 +1127,6 @@ class Symphony extends AbstractBase
                         break;
                     }
                 }
-
             }
         }
 
@@ -1177,7 +1198,7 @@ class Symphony extends AbstractBase
                 $group = null;
             }
 
-            list($lastname,$firstname)
+            list($lastname, $firstname)
                 = explode(', ', $result->patronInfo->displayName);
 
             $profile = [
@@ -1307,7 +1328,7 @@ class Symphony extends AbstractBase
                 ];
             }
             return $holdList;
-        } catch(SoapFault $e) {
+        } catch (SoapFault $e) {
             return null;
         } catch (\Exception $e) {
             throw new ILSException($e->getMessage());
@@ -1348,18 +1369,12 @@ class Symphony extends AbstractBase
                 foreach ($fees as $fee) {
                     $fineList[] = [
                         'amount' => $fee->amount->_ * 100,
-                        'checkout' =>
-                            isset($fee->feeItemInfo->checkoutDate) ?
-                            $fee->feeItemInfo->checkoutDate : null,
+                        'checkout' => $fee->feeItemInfo->checkoutDate ?? null,
                         'fine' => $fee->billReasonDescription,
                         'balance' => $fee->amountOutstanding->_ * 100,
-                        'createdate' =>
-                            isset($fee->dateBilled) ? $fee->dateBilled : null,
-                        'duedate' =>
-                            isset($fee->feeItemInfo->dueDate) ?
-                            $fee->feeItemInfo->dueDate : null,
-                        'id' => isset($fee->feeItemInfo->titleKey) ?
-                            $fee->feeItemInfo->titleKey : null
+                        'createdate' => $fee->dateBilled ?? null,
+                        'duedate' => $fee->feeItemInfo->dueDate ?? null,
+                        'id' => $fee->feeItemInfo->titleKey ?? null
                     ];
                 }
             }
@@ -1386,7 +1401,7 @@ class Symphony extends AbstractBase
         return $holdDetails['reqnum'];
     }
 
-     /**
+    /**
      * Cancel Holds
      *
      * Attempts to Cancel a hold on a particular item
@@ -1434,7 +1449,7 @@ class Symphony extends AbstractBase
         return $result;
     }
 
-     /**
+    /**
      * Public Function which retrieves renew, hold and cancel settings from the
      * driver ini file.
      *
@@ -1442,7 +1457,7 @@ class Symphony extends AbstractBase
      * @param array  $params   Optional feature-specific parameters (array)
      *
      * @return array An array with key-value pairs.
-      *
+     *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function getConfig($function, $params = null)

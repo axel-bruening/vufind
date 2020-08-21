@@ -2,7 +2,7 @@
 /**
  * Solr spelling processor.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,27 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Solr
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\Solr;
+
+use Laminas\Config\Config;
 use VuFindSearch\Backend\Solr\Response\Json\Spellcheck;
 use VuFindSearch\Query\AbstractQuery;
-use Zend\Config\Config;
 
 /**
  * Solr spelling processor.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Solr
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class SpellingProcessor
 {
@@ -46,21 +47,21 @@ class SpellingProcessor
      *
      * @var int
      */
-    protected $spellingLimit = 3;
+    protected $spellingLimit;
 
     /**
      * Spell check words with numbers in them?
      *
      * @var bool
      */
-    protected $spellSkipNumeric = true;
+    protected $spellSkipNumeric;
 
     /**
      * Offer expansions on terms as well as basic replacements?
      *
      * @var bool
      */
-    protected $expand = true;
+    protected $expand;
 
     /**
      * Show the full modified search phrase on screen rather then just the suggested
@@ -68,7 +69,7 @@ class SpellingProcessor
      *
      * @var bool
      */
-    protected $phrase = false;
+    protected $phrase;
 
     /**
      * Constructor
@@ -77,18 +78,10 @@ class SpellingProcessor
      */
     public function __construct($config = null)
     {
-        if (isset($config->limit)) {
-            $this->spellingLimit = $config->limit;
-        }
-        if (isset($config->skip_numeric)) {
-            $this->spellSkipNumeric = $config->skip_numeric;
-        }
-        if (isset($config->expand)) {
-            $this->expand = $config->expand;
-        }
-        if (isset($config->phrase)) {
-            $this->phrase = $config->phrase;
-        }
+        $this->spellingLimit = $config->limit ?? 3;
+        $this->spellSkipNumeric = $config->skip_numeric ?? true;
+        $this->expand = $config->expand ?? true;
+        $this->phrase = $config->phrase ?? false;
     }
 
     /**
@@ -125,7 +118,7 @@ class SpellingProcessor
      */
     public function tokenize($input)
     {
-        // Blacklist of useless tokens:
+        // Exclusion list of useless tokens:
         $joins = ["AND", "OR", "NOT"];
 
         // Strip out parentheses -- irrelevant for tokenization:
@@ -237,7 +230,7 @@ class SpellingProcessor
             return true;
         }
         // We should also skip terms already contained within the query:
-        return $queryContains == $query->containsTerm($term);
+        return $queryContains == $query->containsNormalizedTerm($term);
     }
 
     /**
@@ -257,9 +250,8 @@ class SpellingProcessor
             $inToken = false;
             $targetTerm = "";
             foreach ($this->tokenize($query) as $token) {
-                // TODO - Do we need stricter matching here, similar to that in
-                // \VuFindSearch\Query\Query::replaceTerm()?
-                if (stripos($token, $term) !== false) {
+                // Is the term part of the current token?
+                if (strpos($token, (string)$term) !== false) {
                     $inToken = true;
                     // We need to replace the whole token
                     $targetTerm = $token;
@@ -298,21 +290,16 @@ class SpellingProcessor
     ) {
         $returnArray[$targetTerm]['freq'] = $details['freq'];
         foreach ($details['suggestions'] as $word => $freq) {
-            // If the suggested word is part of a token
-            if ($inToken) {
-                // We need to make sure we replace the whole token
-                $replacement = str_replace($term, $word, $targetTerm);
-            } else {
-                $replacement = $word;
-            }
+            // If the suggested word is part of a token, we need to make sure we
+            // replace the whole token:
+            $replacement = $inToken ? str_replace($term, $word, $targetTerm) : $word;
+
             //  Do we need to show the whole, modified query?
-            if ($this->phrase) {
-                $label = $params->getDisplayQueryWithReplacedTerm(
+            $label = $this->phrase
+                ? $params->getDisplayQueryWithReplacedTerm(
                     $targetTerm, $replacement
-                );
-            } else {
-                $label = $replacement;
-            }
+                ) : $replacement;
+
             // Basic spelling suggestion data
             $returnArray[$targetTerm]['suggestions'][$label] = [
                 'freq' => $freq,
@@ -322,11 +309,9 @@ class SpellingProcessor
             // Only generate expansions if enabled in config
             if ($this->expand) {
                 // Parentheses differ for shingles
-                if (strstr($targetTerm, " ") !== false) {
-                    $replacement = "(($targetTerm) OR ($replacement))";
-                } else {
-                    $replacement = "($targetTerm OR $replacement)";
-                }
+                $replacement = (strstr($targetTerm, " ") !== false)
+                    ? "(($targetTerm) OR ($replacement))"
+                    : "($targetTerm OR $replacement)";
                 $returnArray[$targetTerm]['suggestions'][$label]['expand_term']
                     = $replacement;
             }

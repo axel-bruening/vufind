@@ -2,7 +2,7 @@
 /**
  * Factory for instantiating SMS objects
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2009.
  *
@@ -17,42 +17,50 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Ronan McHugh <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\SMS;
-use Zend\ServiceManager\ServiceLocatorInterface;
+
+use Interop\Container\ContainerInterface;
+use Laminas\ServiceManager\Factory\FactoryInterface;
 
 /**
  * Factory for instantiating SMS objects
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Ronan McHugh <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  *
  * @codeCoverageIgnore
  */
-class Factory implements \Zend\ServiceManager\FactoryInterface
+class Factory implements FactoryInterface
 {
     /**
      * Create service
      *
-     * @param ServiceLocatorInterface $sm Service manager
+     * @param ContainerInterface $container Service manager
+     * @param string             $name      Requested service name (unused)
+     * @param array              $options   Extra options (unused)
      *
-     * @return mixed
+     * @return SMSInterface
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function createService(ServiceLocatorInterface $sm)
-    {
+    public function __invoke(ContainerInterface $container, $name,
+        array $options = null
+    ) {
         // Load configurations:
-        $mainConfig = $sm->get('VuFind\Config')->get('config');
-        $smsConfig = $sm->get('VuFind\Config')->get('sms');
+        $configManager = $container->get(\VuFind\Config\PluginManager::class);
+        $mainConfig = $configManager->get('config');
+        $smsConfig = $configManager->get('sms');
 
         // Determine SMS type:
         $type = isset($smsConfig->General->smsType)
@@ -61,10 +69,11 @@ class Factory implements \Zend\ServiceManager\FactoryInterface
         // Initialize object based on requested type:
         switch (strtolower($type)) {
         case 'clickatell':
-            $client = $sm->get('VuFind\Http')->createClient();
+            $client = $container->get(\VuFindHttp\HttpService::class)
+                ->createClient();
             return new Clickatell($smsConfig, ['client' => $client]);
         case 'mailer':
-            $options = ['mailer' => $sm->get('VuFind\Mailer')];
+            $options = ['mailer' => $container->get(\VuFind\Mailer\Mailer::class)];
             if (isset($mainConfig->Site->email)) {
                 $options['defaultFrom'] = $mainConfig->Site->email;
             }

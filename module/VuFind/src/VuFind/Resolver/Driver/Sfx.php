@@ -2,7 +2,7 @@
 /**
  * SFX Link Resolver Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Royal Holloway, University of London
  *
@@ -20,50 +20,43 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Resolver_Drivers
  * @author   Graham Seaman <Graham.Seaman@rhul.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:link_resolver_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:link_resolver_drivers Wiki
  */
 namespace VuFind\Resolver\Driver;
 
 /**
  * SFX Link Resolver Driver
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Resolver_Drivers
  * @author   Graham Seaman <Graham.Seaman@rhul.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:link_resolver_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:link_resolver_drivers Wiki
  */
-class Sfx implements DriverInterface
+class Sfx extends AbstractBase
 {
-    /**
-     * Base URL for link resolver
-     *
-     * @var string
-     */
-    protected $baseUrl;
-
     /**
      * HTTP client
      *
-     * @var \Zend\Http\Client
+     * @var \Laminas\Http\Client
      */
     protected $httpClient;
 
     /**
      * Constructor
      *
-     * @param string            $baseUrl    Base URL for link resolver
-     * @param \Zend\Http\Client $httpClient HTTP client
+     * @param string               $baseUrl    Base URL for link resolver
+     * @param \Laminas\Http\Client $httpClient HTTP client
      */
-    public function __construct($baseUrl, \Zend\Http\Client $httpClient)
+    public function __construct($baseUrl, \Laminas\Http\Client $httpClient)
     {
-        $this->baseUrl = $baseUrl;
+        parent::__construct($baseUrl);
         $this->httpClient = $httpClient;
     }
 
@@ -79,8 +72,9 @@ class Sfx implements DriverInterface
     public function fetchLinks($openURL)
     {
         // Make the call to SFX and load results
-        $url = $this->baseUrl .
-            '?sfx.response_type=multi_obj_detailed_xml&svc.fulltext=yes&' . $openURL;
+        $url = $this->getResolverUrl(
+            'sfx.response_type=multi_obj_detailed_xml&svc.fulltext=yes&' . $openURL
+        );
         $feed = $this->httpClient->setUri($url)->send()->getBody();
         return $feed;
     }

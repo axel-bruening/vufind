@@ -2,7 +2,7 @@
 /**
  * Mail log writer
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,45 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Error_Logging
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Log\Writer;
 
 /**
- * This class extends the Zend Logging towards Mail systems
+ * This class extends the Laminas Logging towards Mail systems
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Error_Logging
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class Mail extends \Zend\Log\Writer\Mail
+class Mail extends \Laminas\Log\Writer\Mail
 {
-    /**
-     * Holds the verbosity level
-     *
-     * @var int
-     */
-    protected $verbosity = 1;
-
-    /**
-     * Set verbosity
-     *
-     * @param integer $verb verbosity setting
-     *
-     * @return void
-     */
-    public function setVerbosity($verb)
-    {
-        $this->verbosity = $verb;
-    }
+    use VerbosityTrait;
 
     /**
      * Write a message to the log.
@@ -63,16 +46,11 @@ class Mail extends \Zend\Log\Writer\Mail
      * @param array $event event data
      *
      * @return void
-     * @throws \Zend\Log\Exception\RuntimeException
+     * @throws \Laminas\Log\Exception\RuntimeException
      */
     protected function doWrite(array $event)
     {
-        // Apply verbosity filter:
-        if (is_array($event['message'])) {
-            $event['message'] = $event['message'][$this->verbosity];
-        }
-
-        // Call parent method:
-        return parent::doWrite($event);
+        // Apply verbosity, Call parent method:
+        return parent::doWrite($this->applyVerbosity($event));
     }
 }

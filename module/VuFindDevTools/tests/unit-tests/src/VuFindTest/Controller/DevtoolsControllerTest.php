@@ -3,7 +3,7 @@
 /**
  * Unit tests for DevTools controller.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2014.
  *
@@ -18,27 +18,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Controller;
 
+use Laminas\Config\Config;
 use VuFindDevTools\Controller\DevtoolsController as Controller;
-use Zend\Config\Config;
 
 /**
  * Unit tests for DevTools controller.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class DevtoolsControllerTest extends \VuFindTest\Unit\TestCase
 {
@@ -57,7 +57,7 @@ class DevtoolsControllerTest extends \VuFindTest\Unit\TestCase
         $this->assertEquals('English', $result['mainName']);
 
         // Make sure correct type of object was loaded:
-        $this->assertEquals('Zend\I18n\Translator\TextDomain', get_class($result['main']));
+        $this->assertEquals('Laminas\I18n\Translator\TextDomain', get_class($result['main']));
 
         // Shortcut to help check some key details:
         $en = $result['details']['en'];
@@ -67,7 +67,7 @@ class DevtoolsControllerTest extends \VuFindTest\Unit\TestCase
         $this->assertTrue(in_array('search.phtml', $en['helpFiles']));
 
         // Did we put the object in the right place?
-        $this->assertEquals('Zend\I18n\Translator\TextDomain', get_class($en['object']));
+        $this->assertEquals('Laminas\I18n\Translator\TextDomain', get_class($en['object']));
 
         // Did the @parent_ini macro get stripped correctly?
         $this->assertFalse(isset($result['details']['en-gb']['object']['@parent_ini']));
@@ -84,7 +84,8 @@ class DevtoolsControllerTest extends \VuFindTest\Unit\TestCase
     protected function getMockController()
     {
         $config = new Config(['Languages' => ['en' => 'English']]);
-        $c = $this->getMock('VuFindDevTools\Controller\DevtoolsController', ['getConfig']);
+        $c = $this->getMockBuilder(\VuFindDevTools\Controller\DevtoolsController::class)
+            ->setMethods(['getConfig'])->disableOriginalConstructor()->getMock();
         $c->expects($this->any())->method('getConfig')->will($this->returnValue($config));
         return $c;
     }

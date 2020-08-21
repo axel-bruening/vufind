@@ -2,7 +2,7 @@
 /**
  * Recommend Plugin Manager Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Recommend;
+
 use VuFind\Recommend\PluginManager;
 
 /**
  * Recommend Plugin Manager Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class PluginManagerTest extends \VuFindTest\Unit\TestCase
 {
@@ -46,21 +47,25 @@ class PluginManagerTest extends \VuFindTest\Unit\TestCase
      */
     public function testShareByDefault()
     {
-        $pm = new PluginManager(null);
-        $this->assertFalse($pm->shareByDefault());
+        $pm = new PluginManager(
+            $this->createMock(\Interop\Container\ContainerInterface::class)
+        );
+        $this->assertFalse($this->getProperty($pm, 'sharedByDefault'));
     }
 
     /**
      * Test expected interface.
      *
      * @return void
-     *
-     * @expectedException        Zend\ServiceManager\Exception\RuntimeException
-     * @expectedExceptionMessage Plugin ArrayObject does not belong to VuFind\Recommend\RecommendInterface
      */
     public function testExpectedInterface()
     {
-        $pm = new PluginManager(null);
-        $pm->validatePlugin(new \ArrayObject());
+        $this->expectException(\Laminas\ServiceManager\Exception\InvalidServiceException::class);
+        $this->expectExceptionMessage('Plugin ArrayObject does not belong to VuFind\\Recommend\\RecommendInterface');
+
+        $pm = new PluginManager(
+            $this->createMock(\Interop\Container\ContainerInterface::class)
+        );
+        $pm->validate(new \ArrayObject());
     }
 }

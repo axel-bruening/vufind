@@ -2,7 +2,7 @@
 /**
  * Resolver driver plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,77 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Resolver_Drivers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:link_resolver_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:link_resolver_drivers Wiki
  */
 namespace VuFind\Resolver\Driver;
+
+use Laminas\ServiceManager\Factory\InvokableFactory;
 
 /**
  * Resolver driver plugin manager
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Resolver_Drivers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:link_resolver_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:link_resolver_drivers Wiki
  */
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
+    /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        '360link' => Threesixtylink::class,
+        'alma' => Alma::class,
+        'demo' => Demo::class,
+        'ezb' => Ezb::class,
+        'sfx' => Sfx::class,
+        'redi' => Redi::class,
+        'threesixtylink' => Threesixtylink::class,
+        'generic' => Generic::class,
+        'other' => 'generic'
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        Alma::class => DriverWithHttpClientFactory::class,
+        Threesixtylink::class => DriverWithHttpClientFactory::class,
+        Demo::class => InvokableFactory::class,
+        Ezb::class => EzbFactory::class,
+        Sfx::class => DriverWithHttpClientFactory::class,
+        Redi::class => DriverWithHttpClientFactory::class,
+        Generic::class => AbstractBaseFactory::class,
+    ];
+
+    /**
+     * Constructor
+     *
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
+     */
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
+        $this->addAbstractFactory(PluginFactory::class);
+        parent::__construct($configOrContainerInstance, $v3config);
+    }
+
     /**
      * Return the name of the base class or interface that plug-ins must conform
      * to.
@@ -46,6 +96,6 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      */
     protected function getExpectedInterface()
     {
-        return 'VuFind\Resolver\Driver\DriverInterface';
+        return DriverInterface::class;
     }
 }

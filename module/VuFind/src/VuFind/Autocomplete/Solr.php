@@ -2,7 +2,7 @@
 /**
  * Solr Autocomplete Module
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,14 +17,14 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Autocomplete
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:autosuggesters Wiki
+ * @link     https://vufind.org/wiki/development:plugins:autosuggesters Wiki
  */
 namespace VuFind\Autocomplete;
 
@@ -33,11 +33,11 @@ namespace VuFind\Autocomplete;
  *
  * This class provides suggestions by using the local Solr index.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Autocomplete
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:autosuggesters Wiki
+ * @link     https://vufind.org/wiki/development:plugins:autosuggesters Wiki
  */
 class Solr implements AutocompleteInterface
 {
@@ -126,7 +126,7 @@ class Solr implements AutocompleteInterface
         $this->sortField = (isset($params[2]) && !empty($params[2])) ?
             $params[2] : null;
         $this->filters = [];
-        if (count($params > 3)) {
+        if (count($params) > 3) {
             for ($x = 3; $x < count($params); $x += 2) {
                 if (isset($params[$x + 1])) {
                     $this->filters[] = $params[$x] . ':' . $params[$x + 1];
@@ -136,6 +136,18 @@ class Solr implements AutocompleteInterface
 
         // Set up the Search Object:
         $this->initSearchObject();
+    }
+
+    /**
+     * Add filters (in addition to the configured ones)
+     *
+     * @param array $filters Filters to add
+     *
+     * @return void
+     */
+    public function addFilters($filters)
+    {
+        $this->filters += $filters;
     }
 
     /**
@@ -160,7 +172,7 @@ class Solr implements AutocompleteInterface
     protected function mungeQuery($query)
     {
         // Modify the query so it makes a nice, truncated autocomplete query:
-        $forbidden = [':', '(', ')', '*', '+', '"'];
+        $forbidden = [':', '(', ')', '*', '+', '"', "'"];
         $query = str_replace($forbidden, " ", $query);
         if (substr($query, -1) != " ") {
             $query .= "*";

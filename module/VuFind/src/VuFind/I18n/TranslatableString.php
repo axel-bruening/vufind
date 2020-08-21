@@ -2,7 +2,7 @@
 /**
  * Class for translatable string with a special default translation.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) The National Library of Finland 2015.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\I18n;
 
 /**
  * Class for translatable string with a special default translation.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class TranslatableString implements TranslatableStringInterface
 {
@@ -53,15 +53,22 @@ class TranslatableString implements TranslatableStringInterface
     protected $displayString;
 
     /**
+     * Whether translation is allowed
+     */
+    protected $translatable;
+
+    /**
      * Constructor
      *
      * @param string $string        Original string
      * @param string $displayString Translatable display string
+     * @param bool   $translatable  Whether translation is allowed
      */
-    public function __construct($string, $displayString)
+    public function __construct($string, $displayString, $translatable = true)
     {
         $this->string = (string)$string;
         $this->displayString = $displayString;
+        $this->translatable = $translatable;
     }
 
     /**
@@ -83,5 +90,15 @@ class TranslatableString implements TranslatableStringInterface
     public function getDisplayString()
     {
         return $this->displayString;
+    }
+
+    /**
+     * Checks if the string can be translated
+     *
+     * @return bool
+     */
+    public function isTranslatable()
+    {
+        return $this->translatable;
     }
 }

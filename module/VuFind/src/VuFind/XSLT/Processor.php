@@ -2,7 +2,7 @@
 /**
  * VuFind XSLT wrapper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,53 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  XSLT
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/ Wiki
+ * @link     https://vufind.org/wiki/ Wiki
  */
 namespace VuFind\XSLT;
-use DOMDocument, XSLTProcessor;
+
+use DOMDocument;
+use XSLTProcessor;
 
 /**
  * VuFind XSLT wrapper
  *
- * @category VuFind2
+ * @category VuFind
  * @package  XSLT
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/ Wiki
+ * @link     https://vufind.org/wiki/ Wiki
  */
 class Processor
 {
+    /**
+     * Locate an XSLT file and return its full path.
+     *
+     * @param string $xslt Filename
+     *
+     * @return string
+     * @throws \Exception
+     */
+    protected static function findXslt($xslt)
+    {
+        $paths = [
+            LOCAL_OVERRIDE_DIR . '/xsl/',
+            APPLICATION_PATH . '/module/VuFind/xsl/',
+            APPLICATION_PATH . '/xsl/',
+        ];
+        foreach ($paths as $path) {
+            if (file_exists($path . $xslt)) {
+                return $path . $xslt;
+            }
+        }
+        throw new \Exception('Cannot locate ' . $xslt);
+    }
+
     /**
      * Perform an XSLT transformation and return the results.
      *
@@ -51,12 +76,14 @@ class Processor
     public static function process($xslt, $xml, $params = [])
     {
         $style = new DOMDocument();
-        // TODO: support local overrides
-        $style->load(APPLICATION_PATH . '/module/VuFind/xsl/' . $xslt);
+        $style->load(static::findXslt($xslt));
         $xsl = new XSLTProcessor();
         $xsl->importStyleSheet($style);
         $doc = new DOMDocument();
-        if ($doc->loadXML($xml)) {
+        $sanitizeXmlRegEx
+            = '[^\x{0009}\x{000a}\x{000d}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]+';
+        $cleanXml = trim(preg_replace("/$sanitizeXmlRegEx/u", ' ', $xml));
+        if ($doc->loadXML($cleanXml)) {
             foreach ($params as $key => $value) {
                 $xsl->setParameter('', $key, $value);
             }

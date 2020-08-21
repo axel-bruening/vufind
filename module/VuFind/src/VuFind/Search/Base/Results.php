@@ -2,7 +2,7 @@
 /**
  * Abstract results search model.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,18 +17,19 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Base
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\Base;
-use VuFind\Search\UrlQueryHelper, Zend\Paginator\Paginator,
-    Zend\ServiceManager\ServiceLocatorAwareInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
+
+use Laminas\Paginator\Paginator;
+use VuFind\Record\Loader;
+use VuFind\Search\Factory\UrlQueryHelperFactory;
 use VuFindSearch\Service as SearchService;
 
 /**
@@ -36,18 +37,14 @@ use VuFindSearch\Service as SearchService;
  *
  * This abstract class defines the results methods for modeling a search in VuFind.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Base
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
-abstract class Results implements ServiceLocatorAwareInterface
+abstract class Results
 {
-    use \Zend\ServiceManager\ServiceLocatorAwareTrait {
-        setServiceLocator as setServiceLocatorThroughTrait;
-    }
-
     /**
      * Search parameters
      *
@@ -63,6 +60,13 @@ abstract class Results implements ServiceLocatorAwareInterface
     protected $resultTotal = null;
 
     /**
+     * Search backend identifier.
+     *
+     * @var string
+     */
+    protected $backendId;
+
+    /**
      * Override (only for use in very rare cases)
      *
      * @var int
@@ -76,6 +80,13 @@ abstract class Results implements ServiceLocatorAwareInterface
      * @var array
      */
     protected $results = null;
+
+    /**
+     * Any errors reported by the search backend
+     *
+     * @var array
+     */
+    protected $errors = null;
 
     /**
      * An ID number for saving/retrieving search
@@ -141,15 +152,33 @@ abstract class Results implements ServiceLocatorAwareInterface
     protected $searchService;
 
     /**
+     * Record loader
+     *
+     * @var Loader
+     */
+    protected $recordLoader;
+
+    /**
+     * URL query helper factory
+     *
+     * @var UrlQueryHelperFactory
+     */
+    protected $urlQueryHelperFactory = null;
+
+    /**
      * Constructor
      *
-     * @param \VuFind\Search\Base\Params $params Object representing user search
-     * parameters.
+     * @param \VuFind\Search\Base\Params $params        Object representing user
+     * search parameters.
+     * @param SearchService              $searchService Search service
+     * @param Loader                     $recordLoader  Record loader
      */
-    public function __construct(Params $params)
-    {
-        // Save the parameters, then perform the search:
+    public function __construct(Params $params, SearchService $searchService,
+        Loader $recordLoader
+    ) {
         $this->setParams($params);
+        $this->searchService = $searchService;
+        $this->recordLoader = $recordLoader;
     }
 
     /**
@@ -160,8 +189,9 @@ abstract class Results implements ServiceLocatorAwareInterface
     public function __clone()
     {
         if (is_object($this->params)) {
-            $this->params = clone($this->params);
+            $this->params = clone $this->params;
         }
+        $this->helpers = [];
     }
 
     /**
@@ -197,15 +227,28 @@ abstract class Results implements ServiceLocatorAwareInterface
     }
 
     /**
+     * Options for UrlQueryHelper
+     *
+     * @return array
+     */
+    protected function getUrlQueryHelperOptions()
+    {
+        return [];
+    }
+
+    /**
      * Get the URL helper for this object.
      *
-     * @return UrlHelper
+     * @return \VuFind\Search\UrlQueryHelper
      */
     public function getUrlQuery()
     {
         // Set up URL helper:
         if (!isset($this->helpers['urlQuery'])) {
-            $this->helpers['urlQuery'] = new UrlQueryHelper($this->getParams());
+            $factory = $this->getUrlQueryHelperFactory();
+            $this->helpers['urlQuery'] = $factory->fromParams(
+                $this->getParams(), $this->getUrlQueryHelperOptions()
+            );
         }
         return $this->helpers['urlQuery'];
     }
@@ -235,6 +278,7 @@ abstract class Results implements ServiceLocatorAwareInterface
         $this->resultTotal = 0;
         $this->results = [];
         $this->suggestions = [];
+        $this->errors = [];
 
         // Run the search:
         $this->startQueryTimer();
@@ -279,7 +323,7 @@ abstract class Results implements ServiceLocatorAwareInterface
      */
     public function getResultTotal()
     {
-        if (is_null($this->resultTotal)) {
+        if (null === $this->resultTotal) {
             $this->performAndProcessSearch();
         }
         return $this->resultTotal;
@@ -347,10 +391,33 @@ abstract class Results implements ServiceLocatorAwareInterface
      */
     public function getResults()
     {
-        if (is_null($this->results)) {
+        if (null === $this->results) {
             $this->performAndProcessSearch();
         }
         return $this->results;
+    }
+
+    /**
+     * Basic 'getter' for errors.
+     *
+     * @return array
+     */
+    public function getErrors()
+    {
+        if (null === $this->errors) {
+            $this->performAndProcessSearch();
+        }
+        return $this->errors;
+    }
+
+    /**
+     * Basic 'getter' of search backend identifier.
+     *
+     * @return string
+     */
+    public function getBackendId()
+    {
+        return $this->backendId;
     }
 
     /**
@@ -373,7 +440,7 @@ abstract class Results implements ServiceLocatorAwareInterface
         // This data is not available until \VuFind\Db\Table\Search::saveSearch()
         // is called...  blow up if somebody tries to get data that is not yet
         // available.
-        if (is_null($this->savedSearch)) {
+        if (null === $this->savedSearch) {
             throw new \Exception(
                 'Cannot retrieve save status before updateSaveStatus is called.'
             );
@@ -428,7 +495,7 @@ abstract class Results implements ServiceLocatorAwareInterface
      */
     public function getQuerySpeed()
     {
-        if (is_null($this->queryTime)) {
+        if (null === $this->queryTime) {
             $this->performAndProcessSearch();
         }
         return $this->queryTime;
@@ -441,7 +508,7 @@ abstract class Results implements ServiceLocatorAwareInterface
      */
     public function getStartTime()
     {
-        if (is_null($this->queryStartTime)) {
+        if (null === $this->queryStartTime) {
             $this->performAndProcessSearch();
         }
         return $this->queryStartTime;
@@ -463,7 +530,7 @@ abstract class Results implements ServiceLocatorAwareInterface
         }
 
         // Build the standard paginator control:
-        $nullAdapter = "Zend\Paginator\Adapter\NullFill";
+        $nullAdapter = "Laminas\Paginator\Adapter\NullFill";
         $paginator = new Paginator(new $nullAdapter($total));
         $paginator->setCurrentPageNumber($this->getParams()->getPage())
             ->setItemCountPerPage($this->getParams()->getLimit())
@@ -478,7 +545,7 @@ abstract class Results implements ServiceLocatorAwareInterface
      */
     public function getRawSuggestions()
     {
-        if (is_null($this->suggestions)) {
+        if (null === $this->suggestions) {
             $this->performAndProcessSearch();
         }
         return $this->suggestions;
@@ -528,60 +595,6 @@ abstract class Results implements ServiceLocatorAwareInterface
     }
 
     /**
-     * Set the service locator.
-     *
-     * @param ServiceLocatorInterface $serviceLocator Locator to register
-     *
-     * @return Results
-     */
-    public function setServiceLocator(ServiceLocatorInterface $serviceLocator)
-    {
-        // If this isn't the top-level manager, get its parent:
-        if ($serviceLocator instanceof ServiceLocatorAwareInterface) {
-            $serviceLocator = $serviceLocator->getServiceLocator();
-        }
-        return $this->setServiceLocatorThroughTrait($serviceLocator);
-    }
-
-    /**
-     * Restore the service locator (a cascading version of setServiceLocator()).
-     *
-     * @param ServiceLocatorInterface $serviceLocator Locator to register
-     *
-     * @return Results
-     */
-    public function restoreServiceLocator(ServiceLocatorInterface $serviceLocator)
-    {
-        $this->setServiceLocator($serviceLocator);
-        $params = $this->getParams();
-        if (method_exists($params, 'setServiceLocator')) {
-            $params->setServiceLocator($serviceLocator);
-        }
-        // Restore translator:
-        $this->getOptions()
-            ->setTranslator($serviceLocator->get('VuFind\Translator'));
-        $this->getOptions()
-            ->setConfigLoader($serviceLocator->get('VuFind\Config'));
-        return $this;
-    }
-
-    /**
-     * Sleep magic method -- the service locator can't be serialized, so we need to
-     * exclude it from serialization.  Since we can't obtain a new locator in the
-     * __wakeup() method, it needs to be re-injected from outside.
-     *
-     * @return array
-     */
-    public function __sleep()
-    {
-        $vars = get_object_vars($this);
-        unset($vars['serviceLocator']);
-        unset($vars['searchService']);
-        $vars = array_keys($vars);
-        return $vars;
-    }
-
-    /**
      * Return search service.
      *
      * @return SearchService
@@ -591,23 +604,7 @@ abstract class Results implements ServiceLocatorAwareInterface
      */
     protected function getSearchService()
     {
-        if (!$this->searchService) {
-            $this->searchService = $this->getServiceLocator()->get('VuFind\Search');
-        }
         return $this->searchService;
-    }
-
-    /**
-     * Get a database table object.
-     *
-     * @param string $table Name of table to retrieve
-     *
-     * @return \VuFind\Db\Table\Gateway
-     */
-    public function getTable($table)
-    {
-        return $this->getServiceLocator()->get('VuFind\DbTablePluginManager')
-            ->get($table);
     }
 
     /**
@@ -620,5 +617,78 @@ abstract class Results implements ServiceLocatorAwareInterface
         return call_user_func_array(
             [$this->getOptions(), 'translate'], func_get_args()
         );
+    }
+
+    /**
+     * Get URL query helper factory
+     *
+     * @return UrlQueryHelperFactory
+     */
+    protected function getUrlQueryHelperFactory()
+    {
+        if (null === $this->urlQueryHelperFactory) {
+            $this->urlQueryHelperFactory = new UrlQueryHelperFactory();
+        }
+        return $this->urlQueryHelperFactory;
+    }
+
+    /**
+     * Set URL query helper factory
+     *
+     * @param UrlQueryHelperFactory $factory UrlQueryHelperFactory object
+     *
+     * @return void
+     */
+    public function setUrlQueryHelperFactory(UrlQueryHelperFactory $factory)
+    {
+        $this->urlQueryHelperFactory = $factory;
+    }
+
+    /**
+     * Get complete facet counts for several index fields
+     *
+     * @param array  $facetfields  name of the Solr fields to return facets for
+     * @param bool   $removeFilter Clear existing filters from selected fields (true)
+     * or retain them (false)?
+     * @param int    $limit        A limit for the number of facets returned, this
+     * may be useful for very large amounts of facets that can break the JSON parse
+     * method because of PHP out of memory exceptions (default = -1, no limit).
+     * @param string $facetSort    A facet sort value to use (null to retain current)
+     *
+     * @return array an array with the facet values for each index field
+     */
+    public function getFullFieldFacets($facetfields, $removeFilter = true,
+        $limit = -1, $facetSort = null
+    ) {
+        if (!method_exists($this, 'getPartialFieldFacets')) {
+            throw new \Exception('getPartialFieldFacets not implemented');
+        }
+        $page = 1;
+        $facets = [];
+        do {
+            $facetpage = $this->getPartialFieldFacets(
+                $facetfields, $removeFilter, $limit, $facetSort, $page
+            );
+            $nextfields = [];
+            foreach ($facetfields as $field) {
+                if (!empty($facetpage[$field]['data']['list'])) {
+                    if (!isset($facets[$field])) {
+                        $facets[$field] = $facetpage[$field];
+                        $facets[$field]['more'] = false;
+                    } else {
+                        $facets[$field]['data']['list'] = array_merge(
+                            $facets[$field]['data']['list'],
+                            $facetpage[$field]['data']['list']
+                        );
+                    }
+                    if ($facetpage[$field]['more'] !== false) {
+                        $nextfields[] = $field;
+                    }
+                }
+            }
+            $facetfields = $nextfields;
+            $page++;
+        } while ($limit == -1 && !empty($facetfields));
+        return $facets;
     }
 }

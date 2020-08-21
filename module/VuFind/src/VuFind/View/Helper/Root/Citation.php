@@ -2,7 +2,7 @@
 /**
  * Citation view helper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,35 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Juha Luoma <juha.luoma@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Root;
-use VuFind\Exception\Date as DateException;
+
+use VuFind\Date\DateException;
+use VuFind\I18n\Translator\TranslatorAwareInterface;
 
 /**
  * Citation view helper
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Juha Luoma <juha.luoma@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
-class Citation extends \Zend\View\Helper\AbstractHelper
+class Citation extends \Laminas\View\Helper\AbstractHelper
+    implements TranslatorAwareInterface
 {
+    use \VuFind\I18n\Translator\TranslatorAwareTrait;
+
     /**
      * Citation details
      *
@@ -81,16 +88,12 @@ class Citation extends \Zend\View\Helper\AbstractHelper
     public function __invoke($driver)
     {
         // Build author list:
-        $authors = [];
-        $primary = $driver->tryMethod('getPrimaryAuthor');
-        if (empty($primary)) {
-            $primary = $driver->tryMethod('getCorporateAuthor');
+        $authors = (array)$driver->tryMethod('getPrimaryAuthors');
+        if (empty($authors)) {
+            $authors = (array)$driver->tryMethod('getCorporateAuthors');
         }
-        if (!empty($primary)) {
-            $authors[] = $primary;
-        }
-        $secondary = $driver->tryMethod('getSecondaryAuthors');
-        if (is_array($secondary) && !empty($secondary)) {
+        $secondary = (array)$driver->tryMethod('getSecondaryAuthors');
+        if (!empty($secondary)) {
             $authors = array_unique(array_merge($authors, $secondary));
         }
 
@@ -119,9 +122,9 @@ class Citation extends \Zend\View\Helper\AbstractHelper
         $this->details = [
             'authors' => $this->prepareAuthors($authors),
             'title' => trim($title), 'subtitle' => trim($subtitle),
-            'pubPlace' => isset($pubPlaces[0]) ? $pubPlaces[0] : null,
-            'pubName' => isset($publishers[0]) ? $publishers[0] : null,
-            'pubDate' => isset($pubDates[0]) ? $pubDates[0] : null,
+            'pubPlace' => $pubPlaces[0] ?? null,
+            'pubName' => $publishers[0] ?? null,
+            'pubDate' => $pubDates[0] ?? null,
             'edition' => empty($edition) ? [] : [$edition],
             'journal' => $driver->tryMethod('getContainerTitle')
         ];
@@ -270,7 +273,7 @@ class Citation extends \Zend\View\Helper\AbstractHelper
         } else {
             // Add other journal-specific details:
             $mla['pageRange'] = $this->getPageRange();
-            $mla['journal'] =  $this->capitalizeTitle($this->details['journal']);
+            $mla['journal'] = $this->capitalizeTitle($this->details['journal']);
             $mla['numberAndDate'] = $this->getMLANumberAndDate($volNumSeparator);
             return $partial('Citation/mla-article.phtml', $mla);
         }
@@ -502,12 +505,12 @@ class Citation extends \Zend\View\Helper\AbstractHelper
      *
      * @param string $string String to test.
      *
-     * @return boolean       Does string end in punctuation?
+     * @return bool          Does string end in punctuation?
      */
     protected function isPunctuated($string)
     {
         $punctuation = ['.', '?', '!'];
-        return (in_array(substr($string, -1), $punctuation));
+        return in_array(substr($string, -1), $punctuation);
     }
 
     /**
@@ -637,7 +640,7 @@ class Citation extends \Zend\View\Helper\AbstractHelper
                 $i++;
             }
         }
-        return (empty($authorStr) ? false : $authorStr);
+        return empty($authorStr) ? false : $authorStr;
     }
 
     /**
@@ -701,12 +704,12 @@ class Citation extends \Zend\View\Helper\AbstractHelper
             $i = 0;
             if (count($this->details['authors']) > $etAlThreshold) {
                 $author = $this->details['authors'][0];
-                $authorStr = $this->cleanNameDates($author) . ', et al';
+                $authorStr = $this->cleanNameDates($author) . ', et al.';
             } else {
                 foreach ($this->details['authors'] as $author) {
                     if (($i + 1 == count($this->details['authors'])) && ($i > 0)) {
                         // Last
-                        $authorStr .= ', and ' .
+                        $authorStr .= ', ' . $this->translate('and') . ' ' .
                             $this->reverseName($this->stripPunctuation($author));
                     } elseif ($i > 0) {
                         $authorStr .= ', ' .
@@ -719,7 +722,7 @@ class Citation extends \Zend\View\Helper\AbstractHelper
                 }
             }
         }
-        return (empty($authorStr) ? false : $this->stripPunctuation($authorStr));
+        return empty($authorStr) ? false : $this->stripPunctuation($authorStr);
     }
 
     /**

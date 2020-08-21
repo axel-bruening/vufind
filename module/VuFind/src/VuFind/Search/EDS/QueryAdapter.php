@@ -3,7 +3,7 @@
 /**
  * EDS API Query Adapter: search query parameters to AbstractQuery object
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -18,29 +18,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  EBSCO
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\EDS;
 
+use Laminas\Stdlib\Parameters;
 use VuFindSearch\Query\AbstractQuery;
-use VuFindSearch\Query\QueryGroup;
 use VuFindSearch\Query\Query;
-use Zend\StdLib\Parameters;
+use VuFindSearch\Query\QueryGroup;
 
 /**
  * EDS API Query Adapter: search query parameters to AbstractQuery object
  *
- * @category VuFind2
+ * @category VuFind
  * @package  EBSCO
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class QueryAdapter extends \VuFind\Search\QueryAdapter
 {
@@ -76,7 +76,7 @@ class QueryAdapter extends \VuFind\Search\QueryAdapter
     protected static function displayAdvanced(AbstractQuery $query, $translate,
         $showName
     ) {
-            $output = '';
+        $output = '';
         //There should only ever be 1 group with EDS queries.
         $all = [];
         foreach ($query->getQueries() as $search) {

@@ -2,7 +2,7 @@
 /**
  * Database authentication class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,29 +17,35 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Chris Hallberg <challber@villanova.edu>
  * @author   Franck Borel <franck.borel@gbv.de>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 namespace VuFind\Auth;
-use VuFind\Exception\Auth as AuthException, Zend\Crypt\Password\Bcrypt;
+
+use Laminas\Crypt\Password\Bcrypt;
+use Laminas\Http\PhpEnvironment\Request;
+use VuFind\Db\Row\User;
+use VuFind\Db\Table\User as UserTable;
+use VuFind\Exception\Auth as AuthException;
+use VuFind\Exception\AuthEmailNotVerified as AuthEmailNotVerifiedException;
 
 /**
  * Database authentication class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Chris Hallberg <challber@villanova.edu>
  * @author   Franck Borel <franck.borel@gbv.de>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 class Database extends AbstractBase
 {
@@ -60,11 +66,10 @@ class Database extends AbstractBase
     /**
      * Attempt to authenticate the current user.  Throws exception if login fails.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
-     * account credentials.
+     * @param Request $request Request object containing account credentials.
      *
      * @throws AuthException
-     * @return \VuFind\Db\Row\User Object representing logged-in user.
+     * @return User Object representing logged-in user.
      */
     public function authenticate($request)
     {
@@ -80,6 +85,9 @@ class Database extends AbstractBase
         if (!is_object($user) || !$this->checkPassword($this->password, $user)) {
             throw new AuthException('authentication_error_invalid');
         }
+
+        // Verify email address:
+        $this->checkEmailVerified($user);
 
         // If we got this far, the login was successful:
         return $user;
@@ -100,69 +108,42 @@ class Database extends AbstractBase
     /**
      * Create a new user account from the request.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
-     * new account details.
+     * @param Request $request Request object containing new account details.
      *
      * @throws AuthException
-     * @return \VuFind\Db\Row\User New user row.
+     * @return User New user row.
      */
     public function create($request)
     {
-        // Ensure that all expected parameters are populated to avoid notices
-        // in the code below.
-        $params = [
-            'firstname' => '', 'lastname' => '', 'username' => '',
-            'password' => '', 'password2' => '', 'email' => ''
-        ];
-        foreach ($params as $param => $default) {
-            $params[$param] = $request->getPost()->get($param, $default);
-        }
+        // Collect POST parameters from request
+        $params = $this->collectParamsFromRequest($request);
 
-        // Validate Input
+        // Validate username and password
         $this->validateUsernameAndPassword($params);
 
-        // Invalid Email Check
-        $validator = new \Zend\Validator\EmailAddress();
-        if (!$validator->isValid($params['email'])) {
-            throw new AuthException('Email address is invalid');
-        }
-        if (!$this->emailAllowed($params['email'])) {
-            throw new AuthException('authentication_error_creation_blocked');
-        }
+        // Get the user table
+        $userTable = $this->getUserTable();
 
-        // Make sure we have a unique username
-        $table = $this->getUserTable();
-        if ($table->getByUsername($params['username'], false)) {
-            throw new AuthException('That username is already taken');
-        }
-        // Make sure we have a unique email
-        if ($table->getByEmail($params['email'])) {
-            throw new AuthException('That email address is already used');
-        }
+        // Make sure parameters are correct
+        $this->validateParams($params, $userTable);
 
         // If we got this far, we're ready to create the account:
-        $user = $table->createRowForUsername($params['username']);
-        $user->firstname = $params['firstname'];
-        $user->lastname = $params['lastname'];
-        $user->email = $params['email'];
-        if ($this->passwordHashingEnabled()) {
-            $bcrypt = new Bcrypt();
-            $user->pass_hash = $bcrypt->create($params['password']);
-        } else {
-            $user->password = $params['password'];
-        }
+        $user = $this->createUserFromParams($params, $userTable);
         $user->save();
+
+        // Verify email address:
+        $this->checkEmailVerified($user);
+
         return $user;
     }
 
     /**
      * Update a user's password from the request.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
-     * new account details.
+     * @param Request $request Request object containing new account details.
      *
      * @throws AuthException
-     * @return \VuFind\Db\Row\User New user row.
+     * @return User New user row.
      */
     public function updatePassword($request)
     {
@@ -218,10 +199,32 @@ class Database extends AbstractBase
     }
 
     /**
+     * Check if the user's email address has been verified (if necessary) and
+     * throws exception if not.
+     *
+     * @param User $user User to check
+     *
+     * @return void
+     * @throws AuthEmailNotVerifiedException
+     */
+    protected function checkEmailVerified($user)
+    {
+        $config = $this->getConfig();
+        $verify_email = $config->Authentication->verify_email ?? false;
+        if ($verify_email && !$user->checkEmailVerified()) {
+            $exception = new AuthEmailNotVerifiedException(
+                'authentication_error_email_not_verified_html'
+            );
+            $exception->user = $user;
+            throw $exception;
+        }
+    }
+
+    /**
      * Check that the user's password matches the provided value.
      *
      * @param string $password Password to check.
-     * @param object $userRow  The user row.  We pass this instead of the password
+     * @param object $userRow  The user row. We pass this instead of the password
      * because we may need to check different values depending on the password
      * hashing configuration.
      *
@@ -246,7 +249,7 @@ class Database extends AbstractBase
     }
 
     /**
-     * Check that an email address is legal based on whitelist (if configured).
+     * Check that an email address is legal based on inclusion list (if configured).
      *
      * @param string $email Email address to check (assumed to be valid/well-formed)
      *
@@ -254,28 +257,28 @@ class Database extends AbstractBase
      */
     protected function emailAllowed($email)
     {
-        // If no whitelist is configured, all emails are allowed:
-        $config = $this->getConfig();
-        if (!isset($config->Authentication->domain_whitelist)
-            || empty($config->Authentication->domain_whitelist)
-        ) {
+        // If no inclusion list is configured, all emails are allowed:
+        $fullConfig = $this->getConfig();
+        $config = isset($fullConfig->Authentication)
+            ? $fullConfig->Authentication->toArray() : [];
+        $rawIncludeList = $config['legal_domains']
+            ?? $config['domain_whitelist']  // deprecated configuration
+            ?? null;
+        if (empty($rawIncludeList)) {
             return true;
         }
 
-        // Normalize the whitelist:
-        $whitelist = array_map(
-            'trim',
-            array_map(
-                'strtolower', $config->Authentication->domain_whitelist->toArray()
-            )
+        // Normalize the allowed list:
+        $includeList = array_map(
+            'trim', array_map('strtolower', $rawIncludeList)
         );
 
         // Extract the domain from the email address:
         $parts = explode('@', $email);
         $domain = strtolower(trim(array_pop($parts)));
 
-        // Match domain against whitelist:
-        return in_array($domain, $whitelist);
+        // Match domain against allowed list:
+        return in_array($domain, $includeList);
     }
 
     /**
@@ -321,5 +324,85 @@ class Database extends AbstractBase
             $policy['maxLength'] = 32;
         }
         return $policy;
+    }
+
+    /**
+     * Collect parameters from request and populate them.
+     *
+     * @param Request $request Request object containing new account details.
+     *
+     * @return string[]
+     */
+    protected function collectParamsFromRequest($request)
+    {
+        // Ensure that all expected parameters are populated to avoid notices
+        // in the code below.
+        $params = [
+            'firstname' => '', 'lastname' => '', 'username' => '',
+            'password' => '', 'password2' => '', 'email' => ''
+        ];
+        foreach ($params as $param => $default) {
+            $params[$param] = $request->getPost()->get($param, $default);
+        }
+
+        return $params;
+    }
+
+    /**
+     * Validate parameters.
+     *
+     * @param string[]  $params Parameters returned from collectParamsFromRequest()
+     * @param UserTable $table  The VuFind user table
+     *
+     * @throws AuthException
+     *
+     * @return void
+     */
+    protected function validateParams($params, $table)
+    {
+        // Invalid Email Check
+        $validator = new \Laminas\Validator\EmailAddress();
+        if (!$validator->isValid($params['email'])) {
+            throw new AuthException('Email address is invalid');
+        }
+
+        // Check if Email is on allowed list (if applicable)
+        if (!$this->emailAllowed($params['email'])) {
+            throw new AuthException('authentication_error_creation_blocked');
+        }
+
+        // Make sure we have a unique username
+        if ($table->getByUsername($params['username'], false)) {
+            throw new AuthException('That username is already taken');
+        }
+
+        // Make sure we have a unique email
+        if ($table->getByEmail($params['email'])) {
+            throw new AuthException('That email address is already used');
+        }
+    }
+
+    /**
+     * Create a user row object from given parametes.
+     *
+     * @param string[]  $params Parameters returned from collectParamsFromRequest()
+     * @param UserTable $table  The VuFind user table
+     *
+     * @return User A user row object
+     */
+    protected function createUserFromParams($params, $table)
+    {
+        $user = $table->createRowForUsername($params['username']);
+        $user->firstname = $params['firstname'];
+        $user->lastname = $params['lastname'];
+        $user->updateEmail($params['email'], true);
+        if ($this->passwordHashingEnabled()) {
+            $bcrypt = new Bcrypt();
+            $user->pass_hash = $bcrypt->create($params['password']);
+        } else {
+            $user->password = $params['password'];
+        }
+
+        return $user;
     }
 }

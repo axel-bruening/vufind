@@ -2,7 +2,7 @@
 /**
  * VuFind Mailer Class for SMS messages
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2009.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\SMS;
+
 use VuFind\Exception\Mail as MailException;
 
 /**
  * VuFind Mailer Class for SMS messages
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Mailer extends AbstractBase
 {
@@ -72,11 +73,11 @@ class Mailer extends AbstractBase
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config  SMS configuration
-     * @param array               $options Additional options: defaultFrom (optional)
-     * and mailer (must be a \VuFind\Mailer\Mailer object)
+     * @param \Laminas\Config\Config $config  SMS configuration
+     * @param array                  $options Additional options: defaultFrom
+     * (optional) and mailer (must be a \VuFind\Mailer\Mailer object)
      */
-    public function __construct(\Zend\Config\Config $config, $options = [])
+    public function __construct(\Laminas\Config\Config $config, $options = [])
     {
         // Set up parent object first:
         parent::__construct($config, $options);
@@ -93,7 +94,7 @@ class Mailer extends AbstractBase
 
         // Load default "from" address:
         $this->defaultFrom
-            = isset($options['defaultFrom']) ? $options['defaultFrom'] : '';
+            = $options['defaultFrom'] ?? '';
 
         // Make sure mailer dependency has been injected:
         if (!isset($options['mailer'])

@@ -2,7 +2,7 @@
 /**
  * Open Library Utilities
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  OpenLibrary
  * @author   Eoghan Ó Carragáin <eoghan.ocarragain@gmail.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Connection;
 
@@ -32,27 +32,27 @@ namespace VuFind\Connection;
  *
  * Class for accessing helpful Open Library APIs.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  OpenLibrary
  * @author   Eoghan Ó Carragáin <eoghan.ocarragain@gmail.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class OpenLibrary
 {
     /**
      * HTTP client
      *
-     * @var \Zend\Http\Client
+     * @var \Laminas\Http\Client
      */
     protected $client;
 
     /**
      * Constructor
      *
-     * @param \Zend\Http\Client $client HTTP client
+     * @param \Laminas\Http\Client $client HTTP client
      */
-    public function __construct(\Zend\Http\Client $client)
+    public function __construct(\Laminas\Http\Client $client)
     {
         $this->client = $client;
     }

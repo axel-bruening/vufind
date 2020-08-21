@@ -2,7 +2,7 @@
 /**
  * Localization based number formatting
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) snowflake productions gmbh 2014.
  *
@@ -17,26 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Nicolas Karrer <nkarrer@snowflake.ch>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Root;
-use Zend\View\Helper\AbstractHelper;
+
+use Laminas\View\Helper\AbstractHelper;
 
 /**
  * Class NumberFormat
  * allows localization based formating of numbers in view
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Nicolas Karrer <nkarrer@snowflake.ch>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class LocalizedNumber extends AbstractHelper
 {

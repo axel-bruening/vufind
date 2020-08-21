@@ -1,8 +1,8 @@
 <?php
 /**
- * Zend\Feed\Entry extension for Dublin Core
+ * Laminas\Feed\Entry extension for Dublin Core
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,19 +17,20 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Feed_Plugins
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Feed\Writer\Extension\DublinCore;
-use Zend\Feed\Writer\Extension\ITunes\Entry as ParentEntry;
+
+use Laminas\Feed\Writer\Extension\ITunes\Entry as ParentEntry;
 
 /**
- * Zend\Feed\Entry extension for Dublin Core
+ * Laminas\Feed\Entry extension for Dublin Core
  *
  * Note: There doesn't seem to be a generic base class for this functionality,
  * and creating a class with no parent blows up due to unexpected calls to
@@ -37,11 +38,11 @@ use Zend\Feed\Writer\Extension\ITunes\Entry as ParentEntry;
  * equivalent Itunes plugin.  This works fine, but perhaps in future there will
  * be a more elegant way to achieve the same effect.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Feed_Plugins
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Entry extends ParentEntry
 {

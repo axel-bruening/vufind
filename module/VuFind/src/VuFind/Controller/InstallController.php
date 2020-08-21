@@ -2,7 +2,7 @@
 /**
  * Install Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Controller;
-use VuFind\Config\Locator as ConfigLocator,
-    VuFind\Config\Writer as ConfigWriter,
-    Zend\Mvc\MvcEvent,
-    Zend\Crypt\Password\Bcrypt;
+
+use Laminas\Crypt\Password\Bcrypt;
+use Laminas\Mvc\MvcEvent;
+use VuFind\Config\Locator as ConfigLocator;
+use VuFind\Config\Writer as ConfigWriter;
 
 /**
  * Class controls VuFind auto-configuration.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class InstallController extends AbstractBase
 {
@@ -49,7 +50,7 @@ class InstallController extends AbstractBase
      *
      * @return void
      */
-    public function preDispatch(MvcEvent $e)
+    public function validateAutoConfigureConfig(MvcEvent $e)
     {
         // If auto-configuration is disabled, prevent any other action from being
         // accessed:
@@ -71,7 +72,9 @@ class InstallController extends AbstractBase
     {
         parent::attachDefaultListeners();
         $events = $this->getEventManager();
-        $events->attach(MvcEvent::EVENT_DISPATCH, [$this, 'preDispatch'], 1000);
+        $events->attach(
+            MvcEvent::EVENT_DISPATCH, [$this, 'validateAutoConfigureConfig'], 1000
+        );
     }
 
     /**
@@ -163,7 +166,7 @@ class InstallController extends AbstractBase
      */
     protected function checkCache()
     {
-        $cache = $this->getServiceLocator()->get('VuFind\CacheManager');
+        $cache = $this->serviceLocator->get(\VuFind\Cache\Manager::class);
         return [
             'title' => 'Cache',
             'status' => !$cache->hasDirectoryCreationError(),
@@ -178,7 +181,7 @@ class InstallController extends AbstractBase
      */
     public function fixcacheAction()
     {
-        $cache = $this->getServiceLocator()->get('VuFind\CacheManager');
+        $cache = $this->serviceLocator->get(\VuFind\Cache\Manager::class);
         $view = $this->createViewModel();
         $view->cacheDir = $cache->getCacheDir();
         if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
@@ -222,8 +225,8 @@ class InstallController extends AbstractBase
             return false;
         }
 
-        // We need at least PHP v5.3.3:
-        return PHP_VERSION_ID >= 50303;
+        // We need at least PHP v7.2.0:
+        return PHP_VERSION_ID >= 70200;
     }
 
     /**
@@ -235,7 +238,7 @@ class InstallController extends AbstractBase
     {
         $requiredFunctionsExist
             = function_exists('mb_substr') && is_callable('imagecreatefromstring')
-              && function_exists('mcrypt_module_open')
+              && function_exists('openssl_encrypt')
               && class_exists('XSLTProcessor');
 
         return [
@@ -256,7 +259,7 @@ class InstallController extends AbstractBase
 
         // Is our version new enough?
         if (!$this->phpVersionIsNewEnough()) {
-            $msg = "VuFind requires PHP version 5.3.3 or newer; you are running "
+            $msg = "VuFind requires PHP version 7.2 or newer; you are running "
                 . phpversion() . ".  Please upgrade.";
             $this->flashMessenger()->addMessage($msg, 'error');
             $problems++;
@@ -268,7 +271,7 @@ class InstallController extends AbstractBase
                 = "Your PHP installation appears to be missing the mbstring plug-in."
                 . " For better language support, it is recommended that you add"
                 . " this. For details on how to do this, see "
-                . "http://vufind.org/wiki/vufind2:installation_notes "
+                . "https://vufind.org/wiki/installation "
                 . "and look at the PHP installation instructions for your platform.";
             $this->flashMessenger()->addMessage($msg, 'error');
             $problems++;
@@ -280,19 +283,19 @@ class InstallController extends AbstractBase
                 = "Your PHP installation appears to be missing the GD plug-in. "
                 . "For better graphics support, it is recommended that you add this."
                 . " For details on how to do this, see "
-                . "http://vufind.org/wiki/vufind2:installation_notes "
+                . "https://vufind.org/wiki/installation "
                 . "and look at the PHP installation instructions for your platform.";
             $this->flashMessenger()->addMessage($msg, 'error');
             $problems++;
         }
 
-        // Is the mcrypt library missing?
-        if (!function_exists('mcrypt_module_open')) {
+        // Is the openssl library missing?
+        if (!function_exists('openssl_encrypt')) {
             $msg
-                = "Your PHP installation appears to be missing the mcrypt plug-in."
+                = "Your PHP installation appears to be missing the openssl plug-in."
                 . " For better security support, it is recommended that you add"
                 . " this. For details on how to do this, see "
-                . "http://vufind.org/wiki/vufind2:installation_notes "
+                . "https://vufind.org/wiki/installation "
                 . "and look at the PHP installation instructions for your platform.";
             $this->flashMessenger()->addMessage($msg, 'error');
             $problems++;
@@ -303,7 +306,7 @@ class InstallController extends AbstractBase
             $msg
                 = "Your PHP installation appears to be missing the XSL plug-in."
                 . " For details on how to do this, see "
-                . "http://vufind.org/wiki/vufind2:installation_notes "
+                . "https://vufind.org/wiki/installation "
                 . "and look at the PHP installation instructions for your platform.";
             $this->flashMessenger()->addMessage($msg, 'error');
             $problems++;
@@ -332,16 +335,16 @@ class InstallController extends AbstractBase
         if (!preg_match('/^\w*$/', $view->dbname)) {
             $this->flashMessenger()
                 ->addMessage('Database name must be alphanumeric.', 'error');
-        } else if (!preg_match('/^\w*$/', $view->dbuser)) {
+        } elseif (!preg_match('/^\w*$/', $view->dbuser)) {
             $this->flashMessenger()
                 ->addMessage('Database user must be alphanumeric.', 'error');
-        } else if ($skip || $this->formWasSubmitted('submit')) {
+        } elseif ($skip || $this->formWasSubmitted('submit')) {
             $newpass = $this->params()->fromPost('dbpass');
             $newpassConf = $this->params()->fromPost('dbpassconfirm');
             if ((empty($newpass) || empty($newpassConf))) {
                 $this->flashMessenger()
                     ->addMessage('Password fields must not be blank.', 'error');
-            } else if ($newpass != $newpassConf) {
+            } elseif ($newpass != $newpassConf) {
                 $this->flashMessenger()
                     ->addMessage('Password fields must match.', 'error');
             } else {
@@ -352,7 +355,8 @@ class InstallController extends AbstractBase
                 try {
                     $dbName = ($view->driver == 'pgsql')
                         ? 'template1' : $view->driver;
-                    $db = $this->getServiceLocator()->get('VuFind\DbAdapterFactory')
+                    $db = $this->serviceLocator
+                        ->get(\VuFind\Db\AdapterFactory::class)
                         ->getAdapterFromConnectionString("{$connection}/{$dbName}");
                 } catch (\Exception $e) {
                     $this->flashMessenger()
@@ -388,8 +392,8 @@ class InstallController extends AbstractBase
                         foreach ($preCommands as $query) {
                             $db->query($query, $db::QUERY_MODE_EXECUTE);
                         }
-                        $dbFactory = $this->getServiceLocator()
-                            ->get('VuFind\DbAdapterFactory');
+                        $dbFactory = $this->serviceLocator
+                            ->get(\VuFind\Db\AdapterFactory::class);
                         $db = $dbFactory->getAdapterFromConnectionString(
                             $connection . '/' . $view->dbname
                         );
@@ -430,8 +434,8 @@ class InstallController extends AbstractBase
      * Get SQL commands needed to set up a particular database before
      * loading the main SQL file of table definitions.
      *
-     * @param \Zend\View\Model $view        View object containing DB settings.
-     * @param string           $escapedPass Password to set for new DB (escaped
+     * @param \Laminas\View\Model $view        View object containing DB settings.
+     * @param string              $escapedPass Password to set for new DB (escaped
      * appropriately for target database).
      *
      * @return array
@@ -450,18 +454,20 @@ class InstallController extends AbstractBase
             return [$create, $escape, $cuser, $grant];
         }
         // Default: MySQL:
+        $user = "CREATE USER '{$view->dbuser}'@'{$view->vufindhost}'"
+            . "IDENTIFIED BY {$escapedPass}";
         $grant = "GRANT SELECT,INSERT,UPDATE,DELETE ON "
             . $view->dbname
             . ".* TO '{$view->dbuser}'@'{$view->vufindhost}' "
-            . "IDENTIFIED BY {$escapedPass} WITH GRANT OPTION";
-        return [$create, $grant, 'FLUSH PRIVILEGES'];
+            . "WITH GRANT OPTION";
+        return [$create, $user, $grant, 'FLUSH PRIVILEGES'];
     }
 
     /**
      * Get SQL commands needed to set up a particular database after
      * loading the main SQL file of table definitions.
      *
-     * @param \Zend\View\Model $view View object containing DB settings.
+     * @param \Laminas\View\Model $view View object containing DB settings.
      *
      * @return array
      */
@@ -469,9 +475,9 @@ class InstallController extends AbstractBase
     {
         // Special case: PostgreSQL:
         if ($view->driver == 'pgsql') {
-            $grantTables =  "GRANT ALL PRIVILEGES ON ALL TABLES IN "
+            $grantTables = "GRANT ALL PRIVILEGES ON ALL TABLES IN "
                 . "SCHEMA public TO {$view->dbuser} ";
-            $grantSequences =  "GRANT ALL PRIVILEGES ON ALL SEQUENCES"
+            $grantSequences = "GRANT ALL PRIVILEGES ON ALL SEQUENCES"
                 . " IN SCHEMA public TO {$view->dbuser} ";
             return [$grantTables, $grantSequences];
         }
@@ -507,13 +513,7 @@ class InstallController extends AbstractBase
         if (in_array($config->Catalog->driver, ['Sample', 'Demo'])) {
             $status = false;
         } else {
-            try {
-                $catalog = $this->getILS();
-                $catalog->getStatus('1');
-                $status = true;
-            } catch (\Exception $e) {
-                $status = false;
-            }
+            $status = 'ils-offline' !== $this->getILS()->getOfflineMode(true);
         }
         return ['title' => 'ILS', 'status' => $status, 'fix' => 'fixils'];
     }
@@ -557,12 +557,15 @@ class InstallController extends AbstractBase
             $dir
                 = opendir(APPLICATION_PATH . '/module/VuFind/src/VuFind/ILS/Driver');
             $drivers = [];
-            $blacklist = [
-                'Sample.php', 'Demo.php', 'DriverInterface.php', 'AbstractBase.php',
-                'PluginManager.php', 'PluginFactory.php'
+            $excludeList = [
+                'Sample.php', 'Demo.php', 'DriverInterface.php', 'PluginManager.php',
             ];
             while ($line = readdir($dir)) {
-                if (stristr($line, '.php') && !in_array($line, $blacklist)) {
+                if (stristr($line, '.php') && !in_array($line, $excludeList)
+                    && substr($line, 0, 8) !== 'Abstract'
+                    && substr($line, -11) !== 'Factory.php'
+                    && substr($line, -9) !== 'Trait.php'
+                ) {
                     $drivers[] = str_replace('.php', '', $line);
                 }
             }
@@ -586,7 +589,7 @@ class InstallController extends AbstractBase
     protected function testSearchService()
     {
         // Try to retrieve an arbitrary ID -- this will fail if Solr is down:
-        $searchService = $this->getServiceLocator()->get('VuFind\Search');
+        $searchService = $this->serviceLocator->get(\VuFindSearch\Service::class);
         $searchService->retrieve('Solr', '1');
     }
 
@@ -687,8 +690,8 @@ class InstallController extends AbstractBase
      * Support method for fixsecurityAction().  Returns true if the configuration
      * was modified, false otherwise.
      *
-     * @param \Zend\Config\Config $config Existing VuFind configuration
-     * @param ConfigWriter        $writer Config writer
+     * @param \Laminas\Config\Config $config Existing VuFind configuration
+     * @param ConfigWriter           $writer Config writer
      *
      * @return bool
      */
@@ -801,7 +804,7 @@ class InstallController extends AbstractBase
     {
         // Try to retrieve an SSL URL; if we're misconfigured, it will fail.
         try {
-            $this->getServiceLocator()->get('VuFind\Http')
+            $this->serviceLocator->get(\VuFindHttp\HttpService::class)
                 ->get('https://google.com');
             $status = true;
         } catch (\VuFindHttp\Exception\RuntimeException $e) {
@@ -911,4 +914,3 @@ class InstallController extends AbstractBase
         return $this->createViewModel(['checks' => $checks]);
     }
 }
-

@@ -2,7 +2,7 @@
 /**
  * Amicus ILS Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Scanbit 2011.
  *
@@ -17,26 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Josu Moreno <jmoreno@scanbit.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 namespace VuFind\ILS\Driver;
-use PDO, PDOException, VuFind\Exception\ILS as ILSException,
-    VuFind\I18n\Translator\TranslatorAwareInterface;
+
+use PDO;
+use PDOException;
+use VuFind\Exception\ILS as ILSException;
+use VuFind\I18n\Translator\TranslatorAwareInterface;
 
 /**
  * Amicus ILS Driver
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Josu Moreno <jmoreno@scanbit.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 class Amicus extends AbstractBase implements TranslatorAwareInterface
 {
@@ -178,9 +181,9 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      * If there is no on loan items it returns 0.
      * Used in getHolding and getStatus functions
      *
-     * @param integer $copyId The copy id number to check.
+     * @param int $copyId The copy id number to check.
      *
-     * @return integer             Number of on loan items.
+     * @return int        Number of on loan items.
      */
     protected function sacaStatus($copyId)
     {
@@ -216,9 +219,9 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      * If the difference is greater than 50 days it will return one special message
      * If not it returns the due date
      *
-     * @param integer $copyId The copy id number to check.
+     * @param int $copyId The copy id number to check.
      *
-     * @return string             String with special message or due date.
+     * @return string     String with special message or due date.
      */
     protected function sacaFecha($copyId)
     {
@@ -249,9 +252,9 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      * Function that returns the numbers of holds for a copy id number given.
      * If there is no holds it returns 0.
      *
-     * @param integer $holdingId The copy id number to check.
+     * @param int $holdingId The copy id number to check.
      *
-     * @return integer             Integer with the number of holds.
+     * @return int           Integer with the number of holds.
      */
     protected function sacaReservas($holdingId)
     {
@@ -434,16 +437,19 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         include_once 'File/MARC.php';
 
@@ -592,7 +598,7 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's transactions on success.
      */
@@ -604,7 +610,7 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
             "AS DUEDATE, CIRT_ITM.BIB_ITM_NBR AS BIB_ID " .
             "FROM LV_USER, CIRT_ITM " .
             "WHERE LV_USER.PRSN_NBR = CIRT_ITM.PRSN_NBR " .
-            "AND LV_USER.LOGIN =  '" . $patron['id'] . "'";
+            "AND LV_USER.LOGIN = '" . $patron['id'] . "'";
         try {
             $sqlStmt = $this->db->prepare($sql);
             $sqlStmt->execute();
@@ -625,7 +631,7 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return mixed        Array of the patron's fines on success.
      */
@@ -662,7 +668,7 @@ class Amicus extends AbstractBase implements TranslatorAwareInterface
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's holds on success.
      */

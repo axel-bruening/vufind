@@ -3,7 +3,7 @@
 /**
  * Central class for connecting to EIT resources used by VuFind.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Julia Bauder 2013.
  *
@@ -18,31 +18,32 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Connection
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/system_classes Wiki
+ * @link     https://vufind.org/wiki/development:architecture Wiki
  */
 namespace VuFindSearch\Backend\EIT;
 
-use VuFindSearch\ParamBag;
+use Laminas\Http\Client;
+use Laminas\Http\Request;
 use VuFindSearch\Backend\Exception\HttpErrorException;
 
-use Zend\Http\Request;
+use VuFindSearch\ParamBag;
 
 /**
  * Central class for connecting to EIT resources used by VuFind.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Connection
  * @author   Julia Bauder <bauderj@grinnell.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/system_classes Wiki
+ * @link     https://vufind.org/wiki/development:architecture Wiki
  */
-class Connector implements \Zend\Log\LoggerAwareInterface
+class Connector implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
@@ -56,7 +57,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * The HTTP_Request object used for REST transactions
      *
-     * @var \Zend\Http\Client
+     * @var Client
      */
     protected $client;
 
@@ -84,13 +85,13 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * Constructor
      *
-     * @param string            $base   Base URL
-     * @param \Zend\Http\Client $client HTTP client
-     * @param string            $prof   Profile
-     * @param string            $pwd    Password
-     * @param string            $dbs    Database list (comma-separated abbrevs.)
+     * @param string $base   Base URL
+     * @param Client $client HTTP client
+     * @param string $prof   Profile
+     * @param string $pwd    Password
+     * @param string $dbs    Database list (comma-separated abbrevs.)
      */
-    public function __construct($base, \Zend\Http\Client $client, $prof, $pwd, $dbs)
+    public function __construct($base, Client $client, $prof, $pwd, $dbs)
     {
         $this->base = $base;
         $this->client = $client;
@@ -103,8 +104,8 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      * Execute a search.
      *
      * @param ParamBag $params Parameters
-     * @param integer  $offset Search offset
-     * @param integer  $limit  Search limit
+     * @param int      $offset Search offset
+     * @param int      $limit  Search limit
      *
      * @return array
      */
@@ -124,14 +125,14 @@ class Connector implements \Zend\Log\LoggerAwareInterface
         return [
             'docs' => $finalDocs,
             'offset' => $offset,
-            'total' => (integer)$xml->Hits
+            'total' => (int)$xml->Hits
         ];
     }
 
     /**
      * Check for HTTP errors in a response.
      *
-     * @param \Zend\Http\Response $result The response to check.
+     * @param \Laminas\Http\Response $result The response to check.
      *
      * @throws BackendException
      * @return void
@@ -189,7 +190,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
         return $body;
     }
 
-        /**
+    /**
      * Retrieve a specific record.
      *
      * @param string   $id     Record ID to retrieve
@@ -215,7 +216,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
         return [
             'docs' => $finalDocs,
             'offset' => 0,
-            'total' => (integer)$xml->Hits
+            'total' => (int)$xml->Hits
         ];
     }
 }

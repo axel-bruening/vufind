@@ -2,7 +2,7 @@
 /**
  * Solr aspect of the Search Multi-class (Options)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,33 +17,37 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Solr
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\Solr;
 
 /**
  * Solr Search Options
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Solr
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Options extends \VuFind\Search\Base\Options
 {
+    use \VuFind\Search\Options\ViewOptionsTrait;
+
     /**
-     * Pre-assigned filters
+     * Available sort options for facets
      *
      * @var array
      */
-    protected $hiddenFilters = [];
+    protected $facetSortOptions = [
+        '*' => ['count' => 'sort_count', 'index' => 'sort_alphabetic']
+    ];
 
     /**
      * Hierarchical facets
@@ -99,9 +103,6 @@ class Options extends \VuFind\Search\Base\Options
         if (isset($searchSettings->RSS->sort)) {
             $this->rssSort = $searchSettings->RSS->sort;
         }
-        if (isset($searchSettings->General->default_view)) {
-            $this->defaultView = $searchSettings->General->default_view;
-        }
         if (isset($searchSettings->General->default_handler)) {
             $this->defaultHandler = $searchSettings->General->default_handler;
         }
@@ -139,15 +140,13 @@ class Options extends \VuFind\Search\Base\Options
                 'callnumber-sort' => 'sort_callnumber', 'author' => 'sort_author',
                 'title' => 'sort_title'];
         }
-        // Load view preferences (or defaults if none in .ini file):
-        if (isset($searchSettings->Views)) {
-            foreach ($searchSettings->Views as $key => $value) {
-                $this->viewOptions[$key] = $value;
-            }
-        } elseif (isset($searchSettings->General->default_view)) {
-            $this->viewOptions = [$this->defaultView => $this->defaultView];
-        } else {
-            $this->viewOptions = ['list' => 'List'];
+
+        // Set up views
+        $this->initViewOptions($searchSettings);
+
+        // Load list view for result (controls AJAX embedding vs. linking)
+        if (isset($searchSettings->List->view)) {
+            $this->listviewOption = $searchSettings->List->view;
         }
 
         // Load facet preferences
@@ -157,6 +156,18 @@ class Options extends \VuFind\Search\Base\Options
         ) {
             $this->setTranslatedFacets(
                 $facetSettings->Advanced_Settings->translated_facets->toArray()
+            );
+        }
+        if (isset($facetSettings->Advanced_Settings->delimiter)) {
+            $this->setDefaultFacetDelimiter(
+                $facetSettings->Advanced_Settings->delimiter
+            );
+        }
+        if (isset($facetSettings->Advanced_Settings->delimited_facets)
+            && count($facetSettings->Advanced_Settings->delimited_facets) > 0
+        ) {
+            $this->setDelimitedFacets(
+                $facetSettings->Advanced_Settings->delimited_facets->toArray()
             );
         }
         if (isset($facetSettings->Advanced_Settings->special_facets)) {
@@ -174,9 +185,16 @@ class Options extends \VuFind\Search\Base\Options
         }
 
         // Load Spelling preferences
-        $config = $configLoader->get('config');
+        $config = $configLoader->get($this->mainIni);
         if (isset($config->Spelling->enabled)) {
             $this->spellcheck = $config->Spelling->enabled;
+        }
+
+        // Turn on first/last navigation if configured:
+        if (isset($config->Record->first_last_navigation)
+            && $config->Record->first_last_navigation
+        ) {
+            $this->firstlastNavigation = true;
         }
 
         // Turn on highlighting if the user has requested highlighting or snippet
@@ -189,10 +207,8 @@ class Options extends \VuFind\Search\Base\Options
             $this->highlight = true;
         }
 
-        // Load autocomplete preference:
-        if (isset($searchSettings->Autocomplete->enabled)) {
-            $this->autocompleteEnabled = $searchSettings->Autocomplete->enabled;
-        }
+        // Load autocomplete preferences:
+        $this->configureAutocomplete($searchSettings);
 
         // Load shard settings
         if (isset($searchSettings->IndexShards)
@@ -225,28 +241,6 @@ class Options extends \VuFind\Search\Base\Options
     }
 
     /**
-     * Add a hidden (i.e. not visible in facet controls) filter query to the object.
-     *
-     * @param string $fq Filter query for Solr.
-     *
-     * @return void
-     */
-    public function addHiddenFilter($fq)
-    {
-        $this->hiddenFilters[] = $fq;
-    }
-
-    /**
-     * Get an array of hidden filters.
-     *
-     * @return array
-     */
-    public function getHiddenFilters()
-    {
-        return $this->hiddenFilters;
-    }
-
-    /**
      * Return the route name for the search results action.
      *
      * @return string
@@ -265,6 +259,17 @@ class Options extends \VuFind\Search\Base\Options
     public function getAdvancedSearchAction()
     {
         return 'search-advanced';
+    }
+
+    /**
+     * Return the route name for the facet list action. Returns false to cover
+     * unimplemented support.
+     *
+     * @return string|bool
+     */
+    public function getFacetListAction()
+    {
+        return 'search-facetlist';
     }
 
     /**
@@ -295,5 +300,16 @@ class Options extends \VuFind\Search\Base\Options
     public function getHierarchicalFacetSeparators()
     {
         return $this->hierarchicalFacetSeparators;
+    }
+
+    /**
+     * Does this search backend support scheduled searching?
+     *
+     * @return bool
+     */
+    public function supportsScheduledSearch()
+    {
+        // Solr supports this!
+        return true;
     }
 }

@@ -2,7 +2,7 @@
 /**
  * XSLT importer support methods.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (c) Demian Katz 2010.
  *
@@ -17,27 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Import_Tools
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/importing_records Wiki
+ * @link     https://vufind.org/wiki/indexing Wiki
  */
 namespace VuFind\XSLT\Import;
-use DOMDocument, VuFind\Config\Locator as ConfigLocator;
+
+use DOMDocument;
+use VuFind\Config\Locator as ConfigLocator;
 
 /**
  * XSLT support class -- all methods of this class must be public and static;
  * they will be automatically made available to your XSL stylesheet for use
  * with the php:function() function.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Import_Tools
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/importing_records Wiki
+ * @link     https://vufind.org/wiki/indexing Wiki
  */
 class VuFind
 {
@@ -67,7 +69,7 @@ class VuFind
      */
     public static function getChangeTracker()
     {
-        return static::$serviceLocator->get('VuFind\DbTablePluginManager')
+        return static::$serviceLocator->get(\VuFind\Db\Table\PluginManager::class)
             ->get('ChangeTracker');
     }
 
@@ -76,11 +78,12 @@ class VuFind
      *
      * @param string $config Configuration name
      *
-     * @return \Zend\Config\Config
+     * @return \Laminas\Config\Config
      */
     public static function getConfig($config = 'config')
     {
-        return static::$serviceLocator->get('VuFind\Config')->get($config);
+        return static::$serviceLocator->get(\VuFind\Config\PluginManager::class)
+            ->get($config);
     }
 
     /**
@@ -352,7 +355,7 @@ class VuFind
                 $map[$key] = trim($parts[1]);
             }
         }
-        return isset($map[$in]) ? $map[$in] : $in;
+        return $map[$in] ?? $in;
     }
 
     /**
@@ -366,7 +369,9 @@ class VuFind
     {
         static $articles = ['a', 'an', 'the'];
 
-        $text = strtolower(trim($in));
+        $text = is_callable('mb_strtolower')
+            ? mb_strtolower(trim($in), 'UTF-8')
+            : strtolower(trim($in));
 
         foreach ($articles as $a) {
             if (substr($text, 0, strlen($a) + 1) == ($a . ' ')) {
@@ -388,16 +393,11 @@ class VuFind
      */
     public static function xmlAsText($in)
     {
-        // Ensure that $in is an array:
-        if (!is_array($in)) {
-            $in = [$in];
-        }
-
         // Start building return value:
         $text = '';
 
         // Extract all text:
-        foreach ($in as $current) {
+        foreach ((array)$in as $current) {
             // Convert DOMElement to SimpleXML:
             $xml = simplexml_import_dom($current);
 
@@ -422,12 +422,7 @@ class VuFind
      */
     public static function removeTagAndReturnXMLasText($in, $tag)
     {
-        // Ensure that $in is an array:
-        if (!is_array($in)) {
-            $in = [$in];
-        }
-
-        foreach ($in as $current) {
+        foreach ((array)$in as $current) {
             $matches = $current->getElementsByTagName($tag);
             foreach ($matches as $match) {
                 $current->removeChild($match);
@@ -454,5 +449,73 @@ class VuFind
             $dom->appendChild($element);
         }
         return $dom;
+    }
+
+    /**
+     * Proxy the implode PHP function for use in XSL transformation.
+     *
+     * @param string $glue   Glue string
+     * @param array  $pieces DOM elements to join together.
+     *
+     * @return string
+     */
+    public static function implode($glue, $pieces)
+    {
+        $mapper = function ($dom) {
+            return trim($dom->textContent);
+        };
+        return implode($glue, array_map($mapper, $pieces));
+    }
+
+    /**
+     * Try to find the best single year or date range in a set of DOM elements.
+     * Best is defined as the first value to consist of only YYYY or YYYY-ZZZZ,
+     * with no other text. If no "best" match is found, the first value is used.
+     *
+     * @param array $input DOM elements to search.
+     *
+     * @return string
+     */
+    public static function extractBestDateOrRange($input)
+    {
+        foreach ($input as $current) {
+            if (preg_match('/^\d{4}(-\d{4})?$/', $current->textContent)) {
+                return $current->textContent;
+            }
+        }
+        return reset($input)->textContent;
+    }
+
+    /**
+     * Try to find a four-digit year in a set of DOM elements.
+     *
+     * @param array $input DOM elements to search.
+     *
+     * @return string
+     */
+    public static function extractEarliestYear($input)
+    {
+        $goodMatch = $adequateMatch = '';
+        foreach ($input as $current) {
+            // Best match -- a four-digit string starting with 1 or 2
+            preg_match_all('/[12]\d{3}/', $current->textContent, $matches);
+            foreach ($matches[0] as $match) {
+                if (empty($goodMatch) || $goodMatch > $match) {
+                    $goodMatch = $match;
+                }
+            }
+            // Next best match -- any string of four or fewer digits.
+            for ($length = 4; $length > 0; $length--) {
+                preg_match_all(
+                    '/\d{' . $length . '}/', $current->textContent, $matches
+                );
+                foreach ($matches[0] as $match) {
+                    if (strlen($match) > strlen($adequateMatch)) {
+                        $adequateMatch = $match;
+                    }
+                }
+            }
+        }
+        return empty($goodMatch) ? $adequateMatch : $goodMatch;
     }
 }

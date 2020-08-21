@@ -3,7 +3,7 @@
 /**
  * Unit tests for SOLR backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,36 +18,36 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\Solr;
 
+use InvalidArgumentException;
+use Laminas\Http\Response;
+use PHPUnit\Framework\TestCase;
 use VuFindSearch\Backend\Exception\RemoteErrorException;
 use VuFindSearch\Backend\Solr\Backend;
 use VuFindSearch\Backend\Solr\HandlerMap;
+use VuFindSearch\Backend\Solr\Response\Json\RecordCollection;
 use VuFindSearch\ParamBag;
 use VuFindSearch\Query\Query;
-
-use Zend\Http\Response;
-use PHPUnit_Framework_TestCase;
-use InvalidArgumentException;
 
 /**
  * Unit tests for SOLR backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class BackendTest extends PHPUnit_Framework_TestCase
+class BackendTest extends TestCase
 {
     /**
      * Test retrieving a record.
@@ -144,15 +144,38 @@ class BackendTest extends PHPUnit_Framework_TestCase
     }
 
     /**
+     * Test terms component (using ParamBag as first param).
+     *
+     * @return void
+     */
+    public function testTermsWithParamBagAsFirstParameter()
+    {
+        $resp = $this->loadResponse('terms');
+        $conn = $this->getConnectorMock(['query']);
+        $conn->expects($this->once())
+            ->method('query')
+            ->will($this->returnValue($resp->getBody()));
+        $back = new Backend($conn);
+        $back->setIdentifier('test');
+        $bag = new ParamBag();
+        $bag->set('terms.fl', 'author');
+        $bag->set('terms.lower', '');
+        $bag->set('terms.limit', '-1');
+        $terms = $back->terms($bag);
+        $this->assertTrue($terms->hasFieldTerms('author'));
+        $this->assertCount(10, $terms->getFieldTerms('author'));
+    }
+
+    /**
      * Test handling of a bad JSON response.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Backend\Exception\BackendException
-     * @expectedExceptionMessage JSON decoding error: 4 -- bad {
      */
     public function testBadJson()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\BackendException::class);
+        $this->expectExceptionMessage('JSON decoding error: 4 -- bad {');
+
         $conn = $this->getConnectorMock(['query']);
         $conn->expects($this->once())
             ->method('query')
@@ -165,12 +188,12 @@ class BackendTest extends PHPUnit_Framework_TestCase
      * Test injectResponseWriter throws on incompatible response writer.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Exception\InvalidArgumentException
-     * @expectedExceptionMessage Invalid response writer type: xml
      */
     public function testInjectResponseWriterThrownOnIncompabileResponseWriter()
     {
+        $this->expectException(\VuFindSearch\Exception\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid response writer type: xml');
+
         $conn = $this->getConnectorMock();
         $back = new Backend($conn);
         $back->retrieve('foobar', new ParamBag(['wt' => ['xml']]));
@@ -180,12 +203,12 @@ class BackendTest extends PHPUnit_Framework_TestCase
      * Test injectResponseWriter throws on incompatible named list setting.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Exception\InvalidArgumentException
-     * @expectedExceptionMessage Invalid named list implementation type: bad
      */
     public function testInjectResponseWriterThrownOnIncompabileNamedListSetting()
     {
+        $this->expectException(\VuFindSearch\Exception\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid named list implementation type: bad');
+
         $conn = $this->getConnectorMock();
         $back = new Backend($conn);
         $back->retrieve('foobar', new ParamBag(['json.nl' => ['bad']]));
@@ -217,15 +240,53 @@ class BackendTest extends PHPUnit_Framework_TestCase
     }
 
     /**
+     * Test getting multiple IDs.
+     *
+     * @return void
+     */
+    public function testGetIds()
+    {
+        $paramBagChecker = function (ParamBag $params) {
+            $expected = [
+                'wt' => ['json'],
+                'json.nl' => ['arrarr'],
+                'fl' => ['id'],
+                'rows' => [10],
+                'start' => [0],
+                'q' => ['foo'],
+            ];
+            $paramsArr = $params->getArrayCopy();
+            foreach ($expected as $key => $vals) {
+                if (count(array_diff($vals, $paramsArr[$key] ?? [])) !== 0) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        // TODO: currently this test is concerned with ensuring that the right
+        // parameters are sent to Solr; it may be worth adding a more realistic
+        // return value to better test processing of retrieved records.
+        $conn = $this->getConnectorMock(['search']);
+        $conn->expects($this->once())->method('search')
+            ->with($this->callback($paramBagChecker))
+            ->will($this->returnValue(json_encode([])));
+        $back = new Backend($conn);
+        $query = new Query('foo');
+        $result = $back->getIds($query, 0, 10);
+        $this->assertTrue($result instanceof RecordCollection);
+        $this->assertEquals(0, count($result));
+    }
+
+    /**
      * Test refining an alphabrowse exception (string 1).
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Backend\Exception\RemoteErrorException
-     * @expectedExceptionMessage Alphabetic Browse index missing.
      */
     public function testRefineAlphaBrowseException()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\RemoteErrorException::class);
+        $this->expectExceptionMessage('Alphabetic Browse index missing.');
+
         $this->runRefineExceptionCall('does not exist');
     }
 
@@ -233,12 +294,12 @@ class BackendTest extends PHPUnit_Framework_TestCase
      * Test refining an alphabrowse exception (string 2).
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Backend\Exception\RemoteErrorException
-     * @expectedExceptionMessage Alphabetic Browse index missing.
      */
     public function testRefineAlphaBrowseExceptionWithAltString()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\RemoteErrorException::class);
+        $this->expectExceptionMessage('Alphabetic Browse index missing.');
+
         $this->runRefineExceptionCall('couldn\'t find a browse index');
     }
 
@@ -246,12 +307,12 @@ class BackendTest extends PHPUnit_Framework_TestCase
      * Test that we don't refine a non-alphabrowse-related exception.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Backend\Exception\RemoteErrorException
-     * @expectedExceptionMessage not a browse error
      */
     public function testRefineAlphaBrowseExceptionWithNonBrowseString()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\RemoteErrorException::class);
+        $this->expectExceptionMessage('not a browse error');
+
         $this->runRefineExceptionCall('not a browse error');
     }
 
@@ -263,16 +324,17 @@ class BackendTest extends PHPUnit_Framework_TestCase
     public function testRandom()
     {
         // Test that random sort parameter is added:
-        $params = $this->getMock('VuFindSearch\ParamBag', ['set']);
+        $params = $this->getMockBuilder(\VuFindSearch\ParamBag::class)
+            ->setMethods(['set'])->getMock();
         $params->expects($this->once())->method('set')
             ->with($this->equalTo('sort'), $this->matchesRegularExpression('/[0-9]+_random asc/'));
 
         // Test that random proxies search; stub out injectResponseWriter() to prevent it
         // from injecting unwanted extra parameters into $params:
-        $back = $this->getMock(
-            'VuFindSearch\Backend\Solr\Backend', ['search', 'injectResponseWriter'],
-            [$this->getConnectorMock()]
-        );
+        $back = $this->getMockBuilder(__NAMESPACE__ . '\BackendMock')
+            ->setMethods(['search', 'injectResponseWriter'])
+            ->setConstructorArgs([$this->getConnectorMock()])
+            ->getMock();
         $back->expects($this->once())->method('injectResponseWriter');
         $back->expects($this->once())->method('search')
             ->will($this->returnValue('dummy'));
@@ -291,7 +353,7 @@ class BackendTest extends PHPUnit_Framework_TestCase
     protected function runRefineExceptionCall($msg)
     {
         $conn = $this->getConnectorMock(['query']);
-        $e = new RemoteErrorException($msg, 400, new \Zend\Http\Response());
+        $e = new RemoteErrorException($msg, 400, new \Laminas\Http\Response());
         $conn->expects($this->once())->method('query')
             ->with($this->equalTo('browse'))
             ->will($this->throwException($e));
@@ -304,7 +366,7 @@ class BackendTest extends PHPUnit_Framework_TestCase
      *
      * @param string $fixture Fixture file
      *
-     * @return Zend\Http\Response
+     * @return Laminas\Http\Response
      *
      * @throws InvalidArgumentException Fixture files does not exist
      */
@@ -327,6 +389,16 @@ class BackendTest extends PHPUnit_Framework_TestCase
     protected function getConnectorMock(array $mock = [])
     {
         $map = new HandlerMap(['select' => ['fallback' => true]]);
-        return $this->getMock('VuFindSearch\Backend\Solr\Connector', $mock, ['http://example.org/', $map]);
+        return $this->getMockBuilder(\VuFindSearch\Backend\Solr\Connector::class)
+            ->setMethods($mock)
+            ->setConstructorArgs(['http://example.org/', $map])
+            ->getMock();
+    }
+}
+
+class BackendMock extends \VuFindSearch\Backend\Solr\Backend
+{
+    public function injectResponseWriter(\VuFindSearch\ParamBag $params)
+    {
     }
 }

@@ -2,7 +2,7 @@
 /**
  * Version Reader Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Config;
+
 use VuFind\Config\Version;
 
 /**
  * Version Reader Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class VersionTest extends \VuFindTest\Unit\TestCase
 {
@@ -58,12 +59,12 @@ class VersionTest extends \VuFindTest\Unit\TestCase
      * Test with a bad directory.
      *
      * @return void
-     *
-     * @expectedException        Exception
-     * @expectedExceptionMessage Cannot load /will/never/exist/ever/ever/build.xml.
      */
     public function testMissingFile()
     {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot load /will/never/exist/ever/ever/build.xml.');
+
         Version::getBuildVersion('/will/never/exist/ever/ever');
     }
 

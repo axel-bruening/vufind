@@ -2,7 +2,7 @@
 /**
  * VuFind Search Runner
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search;
+
+use Laminas\EventManager\EventManager;
+use Laminas\EventManager\EventManagerInterface;
+use Laminas\Stdlib\Parameters;
 use VuFind\Search\Results\PluginManager as ResultsManager;
-use Zend\EventManager\EventManagerInterface;
-use Zend\EventManager\EventManager;
-use Zend\Stdlib\Parameters;
 
 /**
  * VuFind Search Runner
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class SearchRunner
 {
@@ -75,10 +76,15 @@ class SearchRunner
      * Constructor
      *
      * @param ResultsManager $resultsManager Results manager
+     * @param EventManager   $events         Event manager (optional)
      */
-    public function __construct(ResultsManager $resultsManager)
-    {
+    public function __construct(ResultsManager $resultsManager,
+        EventManager $events = null
+    ) {
         $this->resultsManager = $resultsManager;
+        if (null !== $events) {
+            $this->setEventManager($events);
+        }
     }
 
     /**
@@ -90,13 +96,16 @@ class SearchRunner
      * and attaching listeners; if provided, will be passed three parameters:
      * this object, the search parameters object, and a unique identifier for
      * the current running search.
+     * @param string           $lastView      Last valid view parameter loaded
+     * from a previous search (optional; used for view persistence).
      *
      * @return \VuFind\Search\Base\Results
      *
      * @throws \VuFindSearch\Backend\Exception\BackendException
      */
-    public function run($rawRequest, $searchClassId = 'Solr', $setupCallback = null)
-    {
+    public function run($rawRequest, $searchClassId = 'Solr', $setupCallback = null,
+        $lastView = null
+    ) {
         // Increment the ID counter, then save the current value to a variable;
         // since events within this run could theoretically trigger additional
         // runs of the SearchRunner, we can't rely on the property value past
@@ -112,6 +121,7 @@ class SearchRunner
         // Set up the search:
         $results = $this->resultsManager->get($searchClassId);
         $params = $results->getParams();
+        $params->setLastView($lastView);
         $params->initFromRequest($request);
 
         if (is_callable($setupCallback)) {

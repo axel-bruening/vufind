@@ -1,9 +1,24 @@
-Package: vufind2
-Version: 2.5
+Package: vufind
+Version: 7.0
 Section: World Wide Web
 Priority: Optional
 Architecture: all
-Depends: default-jdk, apache2, php5, php5-dev, php-pear, php5-intl, php5-json, php5-ldap, php5-mcrypt, php5-mysql, php5-xsl, php5-gd, mysql-server
+Depends: apache2,
+         default-jdk,
+         libapache2-mod-php,
+         mysql-server | virtual-mysql-server-core,
+         php-pear,
+         php,
+         php-curl,
+         php-dev,
+         php-gd,
+         php-intl,
+         php-json,
+         php-ldap,
+         php-mbstring,
+         php-mysql,
+         php-soap,
+         php-xml
 Maintainer: VuFind Project Administration Team <vufind-admins@lists.sourceforge.net>
 Homepage: http://vufind.org/
 Description: A library resource discovery portal

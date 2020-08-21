@@ -2,7 +2,7 @@
 /**
  * Mink test class for basic record functionality.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,27 +17,30 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Mink;
 
 /**
  * Mink test class for basic record functionality.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
+ * @retry    4
  */
 class RecordTest extends \VuFindTest\Unit\MinkTestCase
 {
+    use \VuFindTest\Unit\AutoRetryTrait;
+
     /**
      * Test record tabs for a particular ID.
      *
@@ -53,15 +56,46 @@ class RecordTest extends \VuFindTest\Unit\MinkTestCase
         );
         $session = $this->getMinkSession();
         $session->visit($url);
-        $this->assertHttpStatus(200);
         $page = $session->getPage();
-        $staffViewTab = $this->findCss($page, '#details');
+        $staffViewTab = $this->findCss($page, '.record-tabs .details');
         $this->assertEquals('Staff View', $staffViewTab->getText());
         $staffViewTab->click();
         $this->snooze();
         $this->assertEquals($url . '#details', $session->getCurrentUrl());
-        $staffViewTable = $this->findCss($page, '#details-tab table.citation');
+        $staffViewTable = $this->findCss($page, '.record-tabs .details-tab table.citation');
         $this->assertEquals('LEADER', substr($staffViewTable->getText(), 0, 6));
+    }
+
+    /**
+     * Test that we can start on a hashed URL and then move back to the default
+     * tab from there.
+     *
+     * @param string $id       ID to load
+     * @param bool   $encodeId Should we URL encode the ID?
+     *
+     * @return void
+     */
+    protected function tryLoadingTabHashAndReturningToDefault($id, $encodeId = true)
+    {
+        // special test for going back to default tab from non-default URL
+        $url = $this->getVuFindUrl(
+            '/Record/' . ($encodeId ? rawurlencode($id) : $id) . '/Holdings#details'
+        );
+        $session = $this->getMinkSession();
+        $session->visit($url);
+        $page = $session->getPage();
+        $this->snooze();
+        $staffViewTable = $this->findCss($page, '.record-tabs .details-tab table.citation');
+        $this->assertEquals('LEADER', substr($staffViewTable->getText(), 0, 6));
+        $page = $session->getPage();
+        $staffViewTab = $this->findCss($page, '.record-tabs .holdings');
+        $this->assertEquals('Holdings', $staffViewTab->getText());
+        $staffViewTab->click();
+        $this->snooze();
+        $holdingsTabHeader = $this->findCss($page, '.record-tabs .holdings-tab h3');
+        $this->assertEquals('3rd Floor Main Library', $holdingsTabHeader->getText());
+        list($baseUrl) = explode('#', $url);
+        $this->assertEquals($baseUrl, $session->getCurrentUrl());
     }
 
     /**
@@ -72,6 +106,7 @@ class RecordTest extends \VuFindTest\Unit\MinkTestCase
     public function testRecordTabsOnNormalId()
     {
         $this->tryRecordTabsOnId('testsample1');
+        $this->tryLoadingTabHashAndReturningToDefault('testsample2');
     }
 
     /**
@@ -82,6 +117,9 @@ class RecordTest extends \VuFindTest\Unit\MinkTestCase
     public function testRecordTabsOnSpacedId()
     {
         $this->tryRecordTabsOnId('dot.dash-underscore__3.space suffix');
+        $this->tryLoadingTabHashAndReturningToDefault(
+            'dot.dash-underscore__3.space suffix'
+        );
     }
 
     /**
@@ -91,8 +129,25 @@ class RecordTest extends \VuFindTest\Unit\MinkTestCase
      */
     public function testRecordTabsOnPlusId()
     {
-        // Skip encoding on this one, because Zend Framework doesn't URL encode
+        // Skip encoding on this one, because Laminas doesn't URL encode
         // plus signs in route segments!
         $this->tryRecordTabsOnId('theplus+andtheminus-', false);
+        $this->tryLoadingTabHashAndReturningToDefault(
+            'theplus+andtheminus-', false
+        );
+    }
+
+    /**
+     * Test that tabs work correctly with loadInitialTabWithAjax turned on.
+     *
+     * @return void
+     */
+    public function testLoadInitialTabWithAjax()
+    {
+        $this->changeConfigs(
+            ['config' => ['Site' => ['loadInitialTabWithAjax' => 1]]]
+        );
+        $this->tryRecordTabsOnId('testsample1');
+        $this->tryLoadingTabHashAndReturningToDefault('testsample2');
     }
 }

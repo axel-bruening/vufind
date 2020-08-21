@@ -2,7 +2,7 @@
 /**
  * Evergreen ILS Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -17,16 +17,19 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Warren Layton, NRCan Library <warren.layton@gmail.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 namespace VuFind\ILS\Driver;
-use PDO, PDOException, VuFind\Exception\ILS as ILSException;
+
+use PDO;
+use PDOException;
+use VuFind\Exception\ILS as ILSException;
 
 /**
  * VuFind Connector for Evergreen
@@ -34,11 +37,11 @@ use PDO, PDOException, VuFind\Exception\ILS as ILSException;
  * Written by Warren Layton at the NRCan (Natural Resources Canada)
  * Library.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Warren Layton, NRCan Library <warren.layton@gmail.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 class Evergreen extends AbstractBase
 {
@@ -56,7 +59,7 @@ class Evergreen extends AbstractBase
      */
     protected $dbName;
 
-     /**
+    /**
      * Initialize the driver.
      *
      * Validate configuration and perform all resource-intensive tasks needed to
@@ -111,12 +114,12 @@ class Evergreen extends AbstractBase
 
         // Build SQL Statement
         $sql = <<<HERE
-SELECT ccs.name AS status, acn.label AS callnumber, acpl.name AS location
+SELECT ccs.name AS status, acn.label AS callnumber, aou.name AS location
 FROM config.copy_status ccs
-    INNER JOIN asset.copy ac ON ccs.id = ac.status
-    INNER JOIN asset.call_number acn ON ac.call_number = acn.id
-    INNER JOIN asset.copy_location acpl ON ac.copy_location = acpl.id
-WHERE ac.id = ?
+    INNER JOIN asset.copy ac ON ac.status = ccs.id
+    INNER JOIN asset.call_number acn ON acn.id = ac.call_number
+    INNER JOIN actor.org_unit aou ON aou.id = ac.circ_lib
+WHERE acn.record = ?
 HERE;
 
         // Execute SQL
@@ -185,16 +188,19 @@ HERE;
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         $holding = [];
 
@@ -350,7 +356,7 @@ HERE;
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's transactions on success.
      */
@@ -394,7 +400,7 @@ HERE;
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return mixed        Array of the patron's fines on success.
      */
@@ -451,7 +457,7 @@ HERE;
      *
      * @param array $patron The patron array from patronLogin
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array        Array of the patron's holds on success.
      */
@@ -582,23 +588,23 @@ HERE;
      */
     //public function placeHold($holdDetails)
     //{
-        // Need to check asset.copy.status -> config.copy_status.holdable = true
-        // If it is holdable, place hold in action.hold_request:
-        // request_time to now, current_copy to asset.copy.id,
-        // usr to action.usr.id of requesting patron,
-        // phone_notify to phone number, email_notify to t/f
-        // set pickup_lib too?
+    // Need to check asset.copy.status -> config.copy_status.holdable = true
+    // If it is holdable, place hold in action.hold_request:
+    // request_time to now, current_copy to asset.copy.id,
+    // usr to action.usr.id of requesting patron,
+    // phone_notify to phone number, email_notify to t/f
+    // set pickup_lib too?
 
-        /*
-        $sql = "";
+    /*
+    $sql = "";
 
-        try {
-            $sqlStmt = $this->db->prepare($sql);
-            $sqlStmt->execute();
-        } catch (PDOException $e) {
-            throw new ILSException($e->getMessage());
-        }
-        */
+    try {
+        $sqlStmt = $this->db->prepare($sql);
+        $sqlStmt->execute();
+    } catch (PDOException $e) {
+        throw new ILSException($e->getMessage());
+    }
+    */
     //}
 
     /**

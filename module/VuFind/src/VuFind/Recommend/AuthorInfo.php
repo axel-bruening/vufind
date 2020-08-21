@@ -2,7 +2,7 @@
 /**
  * AuthorInfo Recommendations Module
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,19 +17,20 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  */
 namespace VuFind\Recommend;
+
+use Laminas\I18n\Translator\TranslatorInterface;
 use VuFind\Connection\Wikipedia;
 use VuFind\I18n\Translator\TranslatorAwareInterface;
 use VuFindSearch\Query\Query;
-use Zend\I18n\Translator\TranslatorInterface;
 
 /**
  * AuthorInfo Recommendations Module
@@ -37,11 +38,11 @@ use Zend\I18n\Translator\TranslatorInterface;
  * This class gathers information from the Wikipedia API and publishes the results
  * to a module at the top of an author's results page
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Recommendations
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:recommendation_modules Wiki
+ * @link     https://vufind.org/wiki/development:plugins:recommendation_modules Wiki
  * @view     AuthorInfoFacets.phtml
  */
 class AuthorInfo implements RecommendInterface, TranslatorAwareInterface
@@ -53,7 +54,7 @@ class AuthorInfo implements RecommendInterface, TranslatorAwareInterface
     /**
      * HTTP client
      *
-     * @var \Zend\Http\Client
+     * @var \Laminas\Http\Client
      */
     protected $client;
 
@@ -97,12 +98,12 @@ class AuthorInfo implements RecommendInterface, TranslatorAwareInterface
      * Constructor
      *
      * @param \VuFind\Search\Results\PluginManager $results Results plugin manager
-     * @param \Zend\Http\Client                    $client  HTTP client
+     * @param \Laminas\Http\Client                 $client  HTTP client
      * @param string                               $sources Source identifiers
      * (currently, only 'wikipedia' is supported)
      */
     public function __construct(\VuFind\Search\Results\PluginManager $results,
-        \Zend\Http\Client $client, $sources = 'wikipedia'
+        \Laminas\Http\Client $client, $sources = 'wikipedia'
     ) {
         $this->resultsManager = $results;
         $this->client = $client;
@@ -149,7 +150,7 @@ class AuthorInfo implements RecommendInterface, TranslatorAwareInterface
      * be needed.
      *
      * @param \VuFind\Search\Base\Params $params  Search parameter object
-     * @param \Zend\StdLib\Parameters    $request Parameter object representing user
+     * @param \Laminas\Stdlib\Parameters $request Parameter object representing user
      * request.
      *
      * @return void

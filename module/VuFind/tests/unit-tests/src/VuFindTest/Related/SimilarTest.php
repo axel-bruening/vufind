@@ -2,7 +2,7 @@
 /**
  * Similar Related Items Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Related;
+
 use VuFind\Related\Similar;
 
 /**
  * Similar Related Items Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class SimilarTest extends \VuFindTest\Unit\TestCase
 {
@@ -48,11 +49,15 @@ class SimilarTest extends \VuFindTest\Unit\TestCase
     {
         // Similar is really just a thin wrapper around the search service; make
         // sure it does its job properly with the help of some mocks.
-        $driver = $this->getMock('VuFind\RecordDriver\SolrDefault', ['getUniqueId']);
+        $driver = $this->getMockBuilder(\VuFind\RecordDriver\SolrDefault::class)
+            ->setMethods(['getUniqueId'])
+            ->getMock();
         $driver->expects($this->once())
             ->method('getUniqueId')
             ->will($this->returnValue('fakeid'));
-        $service = $this->getMock('VuFindSearch\Service', ['similar']);
+        $service = $this->getMockBuilder(\VuFindSearch\Service::class)
+            ->setMethods(['similar'])
+            ->getMock();
         $service->expects($this->once())
             ->method('similar')
             ->with($this->equalTo('Solr'), $this->equalTo('fakeid'))

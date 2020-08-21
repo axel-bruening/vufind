@@ -3,7 +3,7 @@
 /**
  * Unit tests for LibGuides backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,34 +18,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\LibGuides;
 
+use InvalidArgumentException;
+use Laminas\Http\Client\Adapter\Test as TestAdapter;
+use Laminas\Http\Client as HttpClient;
 use VuFindSearch\Backend\LibGuides\Backend;
 use VuFindSearch\Backend\LibGuides\Connector;
 use VuFindSearch\Backend\LibGuides\QueryBuilder;
 use VuFindSearch\Backend\LibGuides\Response\RecordCollectionFactory;
-use Zend\Http\Client\Adapter\Test as TestAdapter;
-use Zend\Http\Client as HttpClient;
 use VuFindSearch\ParamBag;
 use VuFindSearch\Query\Query;
-use InvalidArgumentException;
 
 /**
  * Unit tests for LibGuides backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class BackendTest extends \VuFindTest\Unit\TestCase
 {
@@ -53,12 +53,12 @@ class BackendTest extends \VuFindTest\Unit\TestCase
      * Test retrieving a record (not supported).
      *
      * @return void
-     *
-     * @expectedException        \Exception
-     * @expectedExceptionMessage retrieve() not supported by LibGuides.
      */
     public function testRetrieve()
     {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('retrieve() not supported by LibGuides.');
+
         $conn = $this->getConnector();
         $back = new Backend($conn, $this->getRCFactory());
         $back->retrieve('foo');
@@ -121,7 +121,7 @@ class BackendTest extends \VuFindTest\Unit\TestCase
      */
     public function testConstructorSetters()
     {
-        $fact = $this->getMock('VuFindSearch\Response\RecordCollectionFactoryInterface');
+        $fact = $this->createMock(\VuFindSearch\Response\RecordCollectionFactoryInterface::class);
         $conn = $this->getConnector();
         $back = new Backend($conn, $fact);
         $this->assertEquals($fact, $back->getRecordCollectionFactory());
@@ -143,11 +143,11 @@ class BackendTest extends \VuFindTest\Unit\TestCase
      * Test search exception handling.
      *
      * @return void
-     *
-     * @expectedException VuFindSearch\Backend\Exception\BackendException
      */
     public function testSearchWrapsLibGuidesException()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\BackendException::class);
+
         $conn = $this->getConnectorMock(['query']);
         $conn->expects($this->once())
             ->method('query')
@@ -243,17 +243,17 @@ class BackendTest extends \VuFindTest\Unit\TestCase
      */
     protected function getConnectorMock(array $mock = [])
     {
-        $client = $this->getMock('Zend\Http\Client');
-        return $this->getMock(
-            'VuFindSearch\Backend\LibGuides\Connector', $mock,
-            ['fakeid', $client]
-        );
+        $client = $this->createMock(\Laminas\Http\Client::class);
+        return $this->getMockBuilder(\VuFindSearch\Backend\LibGuides\Connector::class)
+            ->setMethods($mock)
+            ->setConstructorArgs(['fakeid', $client])
+            ->getMock();
     }
 
     /**
      * Build a real record collection factory
      *
-     * @return \VuFindSearch\Backend\LibGuides\Response\XML\RecordCollectionFactory
+     * @return RecordCollectionFactory
      */
     protected function getRCFactory()
     {
@@ -262,6 +262,6 @@ class BackendTest extends \VuFindTest\Unit\TestCase
             $driver->setRawData($data);
             return $driver;
         };
-        return new \VuFindSearch\Backend\LibGuides\Response\RecordCollectionFactory($callback);
+        return new RecordCollectionFactory($callback);
     }
 }

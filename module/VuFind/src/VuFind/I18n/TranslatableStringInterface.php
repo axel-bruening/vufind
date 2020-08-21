@@ -2,7 +2,7 @@
 /**
  * Interface for translatable strings.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) The National Library of Finland 2015.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\I18n;
 
 /**
  * Interface for translatable strings.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 interface TranslatableStringInterface
 {
@@ -45,4 +45,11 @@ interface TranslatableStringInterface
      * @return string
      */
     public function getDisplayString();
+
+    /**
+     * Checks if the string can be translated
+     *
+     * @return bool
+     */
+    public function isTranslatable();
 }

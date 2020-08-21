@@ -2,7 +2,7 @@
 /**
  * MultiAuth Authentication plugin
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,15 +17,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Sam Moffatt <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 namespace VuFind\Auth;
+
 use VuFind\Exception\Auth as AuthException;
 
 /**
@@ -55,11 +56,11 @@ use VuFind\Exception\Auth as AuthException;
  * trim the username and password fields. This is done to enable common filtering
  * before handing off to the authentication handlers.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Sam Moffatt <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 class MultiAuth extends AbstractBase
 {
@@ -122,7 +123,7 @@ class MultiAuth extends AbstractBase
     /**
      * Set configuration; throw an exception if it is invalid.
      *
-     * @param \Zend\Config\Config $config Configuration to set
+     * @param \Laminas\Config\Config $config Configuration to set
      *
      * @throws AuthException
      * @return void
@@ -130,9 +131,11 @@ class MultiAuth extends AbstractBase
     public function setConfig($config)
     {
         parent::setConfig($config);
-        $this->methods = array_map(
-            'trim', explode(',', $config->MultiAuth->method_order)
-        );
+        if (isset($config->MultiAuth->method_order)) {
+            $this->methods = array_map(
+                'trim', explode(',', $config->MultiAuth->method_order)
+            );
+        }
         if (isset($config->MultiAuth->filters)
             && strlen($config->MultiAuth->filters)
         ) {
@@ -145,7 +148,7 @@ class MultiAuth extends AbstractBase
     /**
      * Attempt to authenticate the current user.  Throws exception if login fails.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * account credentials.
      *
      * @throws AuthException
@@ -171,7 +174,7 @@ class MultiAuth extends AbstractBase
     /**
      * Load credentials into the object and apply internal filter settings to them.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * account credentials.
      *
      * @return void
@@ -194,7 +197,7 @@ class MultiAuth extends AbstractBase
      * Do the actual work of authenticating the user (support method for
      * authenticate()).
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * account credentials.
      *
      * @throws AuthException

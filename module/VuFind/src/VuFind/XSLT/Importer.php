@@ -2,7 +2,7 @@
 /**
  * VuFind XSLT importer
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,33 +17,49 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  XSLT
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/ Wiki
+ * @link     https://vufind.org/wiki/ Wiki
  */
 namespace VuFind\XSLT;
-use DOMDocument, VuFind\Config\Locator as ConfigLocator,
-    XSLTProcessor, Zend\Console\Console,
-    VuFindSearch\Backend\Solr\Document\RawXMLDocument,
-    Zend\ServiceManager\ServiceLocatorAwareInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
+
+use DOMDocument;
+use Laminas\ServiceManager\ServiceLocatorInterface;
+use VuFind\Config\Locator as ConfigLocator;
+use VuFindSearch\Backend\Solr\Document\RawXMLDocument;
+use XSLTProcessor;
 
 /**
  * VuFind XSLT importer
  *
- * @category VuFind2
+ * @category VuFind
  * @package  XSLT
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/ Wiki
+ * @link     https://vufind.org/wiki/ Wiki
  */
-class Importer implements ServiceLocatorAwareInterface
+class Importer
 {
-    use \Zend\ServiceManager\ServiceLocatorAwareTrait;
+    /**
+     * Service locator
+     *
+     * @var ServiceLocatorInterface
+     */
+    protected $serviceLocator;
+
+    /**
+     * Constructor
+     *
+     * @param ServiceLocatorInterface $sm Service manager
+     */
+    public function __construct(ServiceLocatorInterface $sm)
+    {
+        $this->serviceLocator = $sm;
+    }
 
     /**
      * Save an XML file to the Solr index using the specified configuration.
@@ -54,7 +70,7 @@ class Importer implements ServiceLocatorAwareInterface
      * @param bool   $testMode   Are we in test-only mode?
      *
      * @throws \Exception
-     * @return void
+     * @return string            Transformed XML
      */
     public function save($xmlFile, $properties, $index = 'Solr',
         $testMode = false
@@ -64,11 +80,10 @@ class Importer implements ServiceLocatorAwareInterface
 
         // Save the results (or just display them, if in test mode):
         if (!$testMode) {
-            $solr = $this->getServiceLocator()->get('VuFind\Solr\Writer');
+            $solr = $this->serviceLocator->get(\VuFind\Solr\Writer::class);
             $solr->save($index, new RawXMLDocument($xml));
-        } else {
-            Console::write($xml . "\n");
         }
+        return $xml;
     }
 
     /**
@@ -152,8 +167,7 @@ class Importer implements ServiceLocatorAwareInterface
             $classes = is_array($options['General']['custom_class'])
                 ? $options['General']['custom_class']
                 : [$options['General']['custom_class']];
-            $truncate = isset($options['General']['truncate_custom_class'])
-                ? $options['General']['truncate_custom_class'] : true;
+            $truncate = $options['General']['truncate_custom_class'] ?? true;
             foreach ($classes as $class) {
                 // Add a default namespace if none was provided:
                 if (false === strpos($class, '\\')) {
@@ -171,7 +185,7 @@ class Importer implements ServiceLocatorAwareInterface
                 }
                 $methods = get_class_methods($class);
                 if (method_exists($class, 'setServiceLocator')) {
-                    $class::setServiceLocator($this->getServiceLocator());
+                    $class::setServiceLocator($this->serviceLocator);
                 }
                 foreach ($methods as $method) {
                     $xsl->registerPHPFunctions($class . '::' . $method);

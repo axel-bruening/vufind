@@ -3,7 +3,7 @@
 /**
  * Unit tests for Wikipedia connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,31 +18,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Connection;
 
-use VuFind\Connection\Wikipedia;
+use Laminas\Http\Client\Adapter\Test as TestAdapter;
 
-use Zend\Http\Client\Adapter\Test as TestAdapter;
-use Zend\Http\Client as HttpClient;
+use Laminas\Http\Client as HttpClient;
+use VuFind\Connection\Wikipedia;
 
 /**
  * Unit tests for Wikipedia connector.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class WikipediaTest extends \PHPUnit_Framework_TestCase
+class WikipediaTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Test processing of English-language Jane Austen entry.

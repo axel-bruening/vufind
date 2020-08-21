@@ -2,7 +2,7 @@
 /**
  * Solr Reserves aspect of the Search Multi-class (Results)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,38 +17,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_SolrReserves
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Tuan Nguyen <tuan@yorku.ca>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\SolrReserves;
 
 /**
  * Solr Reserves Search Parameters
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_SolrReserves
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Tuan Nguyen <tuan@yorku.ca>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Results extends \VuFind\Search\Solr\Results
 {
     /**
-     * Constructor
+     * Search backend identifier.
      *
-     * @param \VuFind\Search\Base\Params $params Object representing user search
-     * parameters.
+     * @var string
      */
-    public function __construct(\VuFind\Search\Base\Params $params)
-    {
-        parent::__construct($params);
-        $this->backendId = 'SolrReserves';
-    }
+    protected $backendId = 'SolrReserves';
 }

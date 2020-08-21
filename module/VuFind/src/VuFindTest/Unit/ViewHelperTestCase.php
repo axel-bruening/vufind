@@ -3,7 +3,7 @@
 /**
  * Abstract base class for PHPUnit database test cases.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,26 +18,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Unit;
 
 /**
  * Abstract base class for PHPUnit database test cases.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-abstract class ViewHelperTestCase extends TestCase
+abstract class ViewHelperTestCase extends DbTestCase
 {
     /**
      * Get a working renderer.
@@ -45,11 +45,11 @@ abstract class ViewHelperTestCase extends TestCase
      * @param array  $plugins Custom VuFind plug-ins to register
      * @param string $theme   Theme directory to load from
      *
-     * @return \Zend\View\Renderer\PhpRenderer
+     * @return \Laminas\View\Renderer\PhpRenderer
      */
     protected function getPhpRenderer($plugins = [], $theme = 'bootstrap3')
     {
-        $resolver = new \Zend\View\Resolver\TemplatePathStack();
+        $resolver = new \Laminas\View\Resolver\TemplatePathStack();
 
         // This assumes that all themes will be testing inherit directly
         // from root with no intermediate themes.  Probably safe for most
@@ -60,7 +60,7 @@ abstract class ViewHelperTestCase extends TestCase
                 $this->getPathForTheme($theme)
             ]
         );
-        $renderer = new \Zend\View\Renderer\PhpRenderer();
+        $renderer = new \Laminas\View\Renderer\PhpRenderer();
         $renderer->setResolver($resolver);
         if (!empty($plugins)) {
             $pluginManager = $renderer->getHelperPluginManager();

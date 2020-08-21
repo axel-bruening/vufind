@@ -2,7 +2,7 @@
 /**
  * AlphaBrowse Module Controller
  *
- * PHP Version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,36 +17,37 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Mark Triggs <vufind-tech@lists.sourceforge.net>
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/alphabetical_heading_browse Wiki
+ * @link     https://vufind.org/wiki/indexing:alphabetical_heading_browse Wiki
  */
 namespace VuFind\Controller;
 
 use VuFindSearch\ParamBag;
+
 /**
  * AlphabrowseController Class
  *
  * Controls the alphabetical browsing feature
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Mark Triggs <vufind-tech@lists.sourceforge.net>
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/alphabetical_heading_browse Wiki
+ * @link     https://vufind.org/wiki/indexing:alphabetical_heading_browse Wiki
  */
 class AlphabrowseController extends AbstractBase
 {
     /**
      * Gathers data for the view of the AlphaBrowser and does some initialization
      *
-     * @return \Zend\View\Model\ViewModel
+     * @return \Laminas\View\Model\ViewModel
      */
     public function homeAction()
     {
@@ -86,15 +87,15 @@ class AlphabrowseController extends AbstractBase
         // Load remaining config parameters
         $rows_before = isset($config->AlphaBrowse->rows_before)
             && is_numeric($config->AlphaBrowse->rows_before)
-            ? (int) $config->AlphaBrowse->rows_before : 0;
+            ? (int)$config->AlphaBrowse->rows_before : 0;
         $highlighting = isset($config->AlphaBrowse->highlighting)
             ? $config->AlphaBrowse->highlighting : false;
         $limit  = isset($config->AlphaBrowse->page_size)
             && is_numeric($config->AlphaBrowse->page_size)
-            ? (int) $config->AlphaBrowse->page_size : 20;
+            ? (int)$config->AlphaBrowse->page_size : 20;
 
         // Connect to Solr:
-        $db = $this->getServiceLocator()->get('VuFind\Search\BackendManager')
+        $db = $this->serviceLocator->get(\VuFind\Search\BackendManager::class)
             ->get('Solr');
 
         // Process incoming parameters:
@@ -159,7 +160,7 @@ class AlphabrowseController extends AbstractBase
             $highlight_row = $rows_before;
             // special case: match row is < rows_before (i.e. at beginning of list)
             if ($startRow_adj < $rows_before) {
-                $highlight_row =  $startRow_adj;
+                $highlight_row = $startRow_adj;
             }
             // special case: we've gone past the end
             // only the rows_before records will have been returned

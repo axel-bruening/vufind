@@ -2,7 +2,7 @@
 /**
  * Cover Controller
  *
- * PHP Version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,100 +17,131 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Controller;
+
+use VuFind\Cover\CachingProxy;
 use VuFind\Cover\Loader;
+use VuFind\Session\Settings as SessionSettings;
 
 /**
  * Generates covers for book entries
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
-class CoverController extends AbstractBase
+class CoverController extends \Laminas\Mvc\Controller\AbstractActionController
 {
     /**
      * Cover loader
      *
      * @var Loader
      */
-    protected $loader = false;
+    protected $loader;
 
     /**
-     * Get the cover loader object
+     * Proxy loader
      *
-     * @return Loader
+     * @var CachingProxy
      */
-    protected function getLoader()
+    protected $proxy;
+
+    /**
+     * Session settings
+     *
+     * @var SessionSettings
+     */
+    protected $sessionSettings = null;
+
+    /**
+     * Constructor
+     *
+     * @param Loader          $loader Cover loader
+     * @param CachingProxy    $proxy  Proxy loader
+     * @param SessionSettings $ss     Session settings
+     */
+    public function __construct(Loader $loader, CachingProxy $proxy,
+        SessionSettings $ss
+    ) {
+        $this->loader = $loader;
+        $this->proxy = $proxy;
+        $this->sessionSettings = $ss;
+    }
+
+    /**
+     * Convert image parameters into an array for use by the image loader.
+     *
+     * @return array
+     */
+    protected function getImageParams()
     {
-        // Construct object for loading cover images if it does not already exist:
-        if (!$this->loader) {
-            $cacheDir = $this->getServiceLocator()->get('VuFind\CacheManager')
-                ->getCache('cover')->getOptions()->getCacheDir();
-            $this->loader = new Loader(
-                $this->getConfig(),
-                $this->getServiceLocator()->get('VuFind\ContentCoversPluginManager'),
-                $this->getServiceLocator()->get('VuFindTheme\ThemeInfo'),
-                $this->getServiceLocator()->get('VuFind\Http')->createClient(),
-                $cacheDir
-            );
-            \VuFind\ServiceManager\Initializer::initInstance(
-                $this->loader, $this->getServiceLocator()
-            );
-        }
-        return $this->loader;
+        $params = $this->params();  // shortcut for readability
+        return [
+            // Legacy support for "isn" param which has been superseded by isbn:
+            'isbn' => $params()->fromQuery('isbn') ?: $params()->fromQuery('isn'),
+            'size' => $params()->fromQuery('size'),
+            'type' => $params()->fromQuery('contenttype'),
+            'title' => $params()->fromQuery('title'),
+            'author' => $params()->fromQuery('author'),
+            'callnumber' => $params()->fromQuery('callnumber'),
+            'issn' => $params()->fromQuery('issn'),
+            'oclc' => $params()->fromQuery('oclc'),
+            'upc' => $params()->fromQuery('upc'),
+            'recordid' => $params()->fromQuery('recordid'),
+            'source' => $params()->fromQuery('source'),
+            'nbn' => $params()->fromQuery('nbn'),
+            'ismn' => $params()->fromQuery('ismn'),
+        ];
     }
 
     /**
      * Send image data for display in the view
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     public function showAction()
     {
-        $this->writeSession();  // avoid session write timing bug
+        $this->sessionSettings->disableWrite(); // avoid session write timing bug
 
         // Special case: proxy a full URL:
-        $proxy = $this->params()->fromQuery('proxy');
-        if (!empty($proxy)) {
-            return $this->proxyUrl($proxy);
+        $url = $this->params()->fromQuery('proxy');
+        if (!empty($url)) {
+            try {
+                $image = $this->proxy->fetch($url);
+                return $this->displayImage(
+                    $image->getHeaders()->get('content-type')->getFieldValue(),
+                    $image->getContent()
+                );
+            } catch (\Exception $e) {
+                // If an exception occurs, drop through to the standard case
+                // to display an image unavailable graphic.
+            }
         }
 
         // Default case -- use image loader:
-        $this->getLoader()->loadImage(
-            // Legacy support for "isn" param which has been superseded by isbn:
-            $this->params()->fromQuery('isbn', $this->params()->fromQuery('isn')),
-            $this->params()->fromQuery('size'),
-            $this->params()->fromQuery('contenttype'),
-            $this->params()->fromQuery('title'),
-            $this->params()->fromQuery('author'),
-            $this->params()->fromQuery('callnumber'),
-            $this->params()->fromQuery('issn'),
-            $this->params()->fromQuery('oclc'),
-            $this->params()->fromQuery('upc')
-        );
+        $this->loader->loadImage($this->getImageParams());
         return $this->displayImage();
     }
 
     /**
      * Return the default 'image not found' information
      *
-     * @return \Zend\Http\Response
+     * @return \Laminas\Http\Response
      */
     public function unavailableAction()
     {
-        $this->writeSession();  // avoid session write timing bug
-        $this->getLoader()->loadUnavailable();
+        $this->sessionSettings->disableWrite(); // avoid session write timing bug
+        $this->loader->loadUnavailable();
         return $this->displayImage();
     }
 
@@ -118,14 +149,17 @@ class CoverController extends AbstractBase
      * Support method -- update the view to display the image currently found in the
      * \VuFind\Cover\Loader.
      *
-     * @return \Zend\Http\Response
+     * @param string $type  Content type of image (null to access loader)
+     * @param string $image Image data (null to access loader)
+     *
+     * @return \Laminas\Http\Response
      */
-    protected function displayImage()
+    protected function displayImage($type = null, $image = null)
     {
         $response = $this->getResponse();
         $headers = $response->getHeaders();
         $headers->addHeaderLine(
-            'Content-type', $this->getLoader()->getContentType()
+            'Content-type', $type ?: $this->loader->getContentType()
         );
 
         // Send proper caching headers so that the user's browser
@@ -143,21 +177,7 @@ class CoverController extends AbstractBase
             'Expires', gmdate('D, d M Y H:i:s', time() + $coverImageTtl) . ' GMT'
         );
 
-        $response->setContent($this->getLoader()->getImage());
+        $response->setContent($image ?: $this->loader->getImage());
         return $response;
     }
-
-    /**
-     * Proxy a URL.
-     *
-     * @param string $url URL to proxy
-     *
-     * @return \Zend\Http\Response
-     */
-    protected function proxyUrl($url)
-    {
-        $client = $this->getServiceLocator()->get('VuFind\Http')->createClient();
-        return $client->setUri($url)->send();
-    }
 }
-

@@ -2,7 +2,7 @@
 /**
  * Head link view helper (extended for VuFind's theme system)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFindTheme\View\Helper;
+
 use VuFindTheme\ThemeInfo;
 
 /**
  * Head link view helper (extended for VuFind's theme system)
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
-class HeadLink extends \Zend\View\Helper\HeadLink
+class HeadLink extends \Laminas\View\Helper\HeadLink
+    implements \Laminas\Log\LoggerAwareInterface
 {
+    use ConcatTrait;
+    use \VuFind\Log\LoggerAwareTrait;
+
     /**
      * Theme information service
      *
@@ -47,14 +52,36 @@ class HeadLink extends \Zend\View\Helper\HeadLink
     protected $themeInfo;
 
     /**
+     * CSP nonce
+     *
+     * @var string
+     */
+    protected $cspNonce;
+
+    /**
      * Constructor
      *
-     * @param ThemeInfo $themeInfo Theme information service
+     * @param ThemeInfo   $themeInfo Theme information service
+     * @param string|bool $plconfig  Config for current application environment
+     * @param string      $nonce     Nonce from nonce generator
      */
-    public function __construct(ThemeInfo $themeInfo)
+    public function __construct(ThemeInfo $themeInfo, $plconfig = false, $nonce = '')
     {
         parent::__construct();
         $this->themeInfo = $themeInfo;
+        $this->usePipeline = $this->enabledInConfig($plconfig);
+        $this->cspNonce = $nonce;
+        $this->itemKeys[] = 'nonce';
+    }
+
+    /**
+     * Folder name and file extension for trait
+     *
+     * @return string
+     */
+    protected function getFileType()
+    {
+        return 'css';
     }
 
     /**
@@ -78,22 +105,19 @@ class HeadLink extends \Zend\View\Helper\HeadLink
             $url .= filemtime($details['path']);
             $item->href = $url;
         }
-
+        $item->attributes['nonce'] = $this->cspNonce;
         return parent::itemToString($item);
     }
 
     /**
      * Compile a less file to css and add to css folder
      *
-     * @param string $file                  Path to less file
-     * @param string $media                 Media type
-     * @param string $conditionalStylesheet Load condition for file
+     * @param string $file Path to less file
      *
-     * @return void
+     * @return string
      */
-    public function addLessStylesheet($file, $media = 'all',
-        $conditionalStylesheet = false
-    ) {
+    public function addLessStylesheet($file)
+    {
         $relPath = 'less/' . $file;
         $urlHelper = $this->getView()->plugin('url');
         $currentTheme = $this->themeInfo->findContainingTheme($relPath);
@@ -122,15 +146,104 @@ class HeadLink extends \Zend\View\Helper\HeadLink
                     'output' => str_replace('.less', '.css', $file)
                 ]
             );
-            $this->prependStylesheet(
-                $cssDirectory . $css_file_name, $media, $conditionalStylesheet
-            );
+            return $cssDirectory . $css_file_name;
         } catch (\Exception $e) {
             error_log($e->getMessage());
             list($fileName, ) = explode('.', $file);
-            $this->prependStylesheet(
-                $urlHelper('home') . "themes/{$currentTheme}/css/{$fileName}.css"
-            );
+            return $urlHelper('home') . "themes/{$currentTheme}/css/{$fileName}.css";
         }
+    }
+
+    /**
+     * Forcibly prepend a stylesheet removing it from any existing position
+     *
+     * @param string $href                  Stylesheet href
+     * @param string $media                 Media
+     * @param string $conditionalStylesheet Any conditions
+     * @param array  $extras                Array of extra attributes
+     *
+     * @return void
+     */
+    public function forcePrependStylesheet($href, $media = 'screen',
+        $conditionalStylesheet = '', $extras = []
+    ) {
+        // Look for existing entry and remove it if found. Comparison method
+        // copied from isDuplicate().
+        foreach ($this->getContainer() as $offset => $item) {
+            if (($item->rel == 'stylesheet') && ($item->href == $href)) {
+                $this->offsetUnset($offset);
+                break;
+            }
+        }
+        parent::prependStylesheet($href, $media, $conditionalStylesheet, $extras);
+    }
+
+    /**
+     * Returns true if file should not be included in the compressed concat file
+     * Required by ConcatTrait
+     *
+     * @param stdClass $item Link element object
+     *
+     * @return bool
+     */
+    protected function isExcludedFromConcat($item)
+    {
+        return !isset($item->rel) || $item->rel != 'stylesheet'
+            || strpos($item->href, '://');
+    }
+
+    /**
+     * Get the file path from the link object
+     * Required by ConcatTrait
+     *
+     * @param stdClass $item Link element object
+     *
+     * @return string
+     */
+    protected function getResourceFilePath($item)
+    {
+        return $item->href;
+    }
+
+    /**
+     * Set the file path of the link object
+     * Required by ConcatTrait
+     *
+     * @param stdClass $item Link element object
+     * @param string   $path New path string
+     *
+     * @return stdClass
+     */
+    protected function setResourceFilePath($item, $path)
+    {
+        $item->href = $path;
+        return $item;
+    }
+
+    /**
+     * Get the file type
+     *
+     * @param stdClass $item Link element object
+     *
+     * @return string
+     */
+    public function getType($item)
+    {
+        $type = $item->media ?? 'all';
+        if (isset($item->conditionalStylesheet)) {
+            $type .= '_' . $item->conditionalStylesheet;
+        }
+        return $type;
+    }
+
+    /**
+     * Get the minifier that can handle these file types
+     * Required by ConcatTrait
+     *
+     * @return \MatthiasMullie\Minify\JS
+     */
+    protected function getMinifier()
+    {
+        return new \VuFindTheme\Minify\CSS();
     }
 }

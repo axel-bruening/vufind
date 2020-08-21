@@ -2,7 +2,7 @@
 /**
  * HeadThemeResources view helper Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\View\Helper;
-use VuFindTheme\ResourceContainer, VuFindTheme\View\Helper\HeadThemeResources;
+
+use VuFindTheme\ResourceContainer;
+use VuFindTheme\View\Helper\HeadThemeResources;
 
 /**
  * HeadThemeResources view helper Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class HeadThemeResourcesTest extends \VuFindTest\Unit\TestCase
 {
@@ -49,6 +51,25 @@ class HeadThemeResourcesTest extends \VuFindTest\Unit\TestCase
         $helper = new HeadThemeResources($this->getResourceContainer());
         $helper->setView($this->getMockView());
         $helper->__invoke();
+    }
+
+    /**
+     * Test configuration parsing.
+     *
+     * @return void
+     */
+    public function testConfigParsing()
+    {
+        $helper = new HeadThemeResources($this->getResourceContainer());
+        $tests = [
+            'foo:bar:baz' => ['foo', 'bar', 'baz'],
+            'http://foo/bar:baz:xyzzy' => ['http://foo/bar', 'baz', 'xyzzy']
+        ];
+        foreach ($tests as $test => $expected) {
+            $this->assertEquals(
+                $expected, $this->callMethod($helper, 'parseSetting', [$test])
+            );
+        }
     }
 
     /**
@@ -67,19 +88,19 @@ class HeadThemeResourcesTest extends \VuFindTest\Unit\TestCase
     /**
      * Get a fake view object.
      *
-     * @return \Zend\View\Renderer\PhpRenderer
+     * @return \Laminas\View\Renderer\PhpRenderer
      */
     protected function getMockView()
     {
-        $view = $this->getMock('Zend\View\Renderer\PhpRenderer');
+        $view = $this->createMock(\Laminas\View\Renderer\PhpRenderer::class);
         $view->expects($this->at(0))->method('plugin')
-            ->with($this->equalTo('headmeta'))
+            ->with($this->equalTo('headMeta'))
             ->will($this->returnValue($this->getMockHeadMeta()));
         $view->expects($this->at(1))->method('plugin')
-            ->with($this->equalTo('headlink'))
+            ->with($this->equalTo('headLink'))
             ->will($this->returnValue($this->getMockHeadLink()));
         $view->expects($this->at(2))->method('plugin')
-            ->with($this->equalTo('headscript'))
+            ->with($this->equalTo('headScript'))
             ->will($this->returnValue($this->getMockHeadScript()));
         return $view;
     }
@@ -87,11 +108,11 @@ class HeadThemeResourcesTest extends \VuFindTest\Unit\TestCase
     /**
      * Get a fake HeadMeta helper.
      *
-     * @return \Zend\View\Helper\HeadMeta
+     * @return \Laminas\View\Helper\HeadMeta
      */
     protected function getMockHeadMeta()
     {
-        $mock = $this->getMockBuilder('VuFindTheme\View\Helper\HeadMeta')
+        $mock = $this->getMockBuilder(\VuFindTheme\View\Helper\HeadMeta::class)
             ->disableOriginalConstructor()
             ->setMethods(['__invoke', 'prependHttpEquiv', 'appendName'])
             ->getMock();
@@ -106,11 +127,11 @@ class HeadThemeResourcesTest extends \VuFindTest\Unit\TestCase
     /**
      * Get a fake HeadLink helper.
      *
-     * @return \Zend\View\Helper\HeadLink
+     * @return \Laminas\View\Helper\HeadLink
      */
     protected function getMockHeadLink()
     {
-        $mock = $this->getMockBuilder('VuFindTheme\View\Helper\HeadLink')
+        $mock = $this->getMockBuilder(\VuFindTheme\View\Helper\HeadLink::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mock->expects($this->any())->method('__invoke')->will($this->returnValue($mock));
@@ -120,11 +141,11 @@ class HeadThemeResourcesTest extends \VuFindTest\Unit\TestCase
     /**
      * Get a fake HeadScript helper.
      *
-     * @return \Zend\View\Helper\HeadScript
+     * @return \Laminas\View\Helper\HeadScript
      */
     protected function getMockHeadScript()
     {
-        $mock = $this->getMockBuilder('VuFindTheme\View\Helper\HeadScript')
+        $mock = $this->getMockBuilder(\VuFindTheme\View\Helper\HeadScript::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mock->expects($this->any())->method('__invoke')->will($this->returnValue($mock));

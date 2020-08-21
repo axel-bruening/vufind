@@ -2,7 +2,7 @@
 /**
  * SRU Search Interface
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Andrew Nagy 2008.
  *
@@ -17,31 +17,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SRU
  * @author   Andrew S. Nagy <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFindSearch\Backend\SRU;
 
-use VuFindSearch\Backend\Exception\HttpErrorException;
+use VuFind\XSLT\Processor as XSLTProcessor;
 use VuFindSearch\Backend\Exception\BackendException;
 
-use VuFind\XSLT\Processor as XSLTProcessor;
+use VuFindSearch\Backend\Exception\HttpErrorException;
 
 /**
  * SRU Search Interface
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SRU
  * @author   Andrew S. Nagy <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
-class Connector implements \Zend\Log\LoggerAwareInterface
+class Connector implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
@@ -55,7 +55,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * The HTTP_Request object used for REST transactions
      *
-     * @var \Zend\Http\Client
+     * @var \Laminas\Http\Client
      */
     protected $client;
 
@@ -78,10 +78,10 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      *
      * Sets up the SOAP Client
      *
-     * @param string            $host   The URL of the SRU Server
-     * @param \Zend\Http\Client $client An HTTP client object
+     * @param string               $host   The URL of the SRU Server
+     * @param \Laminas\Http\Client $client An HTTP client object
      */
-    public function __construct($host, \Zend\Http\Client $client)
+    public function __construct($host, \Laminas\Http\Client $client)
     {
         // Initialize properties needed for HTTP connection:
         $this->host = $host;
@@ -128,10 +128,10 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     {
         $options = ['operation' => 'scan',
                          'scanClause' => $clause];
-        if (!is_null($pos)) {
+        if (null !== $pos) {
             $options['responsePosition'] = $pos;
         }
-        if (!is_null($maxTerms)) {
+        if (null !== $maxTerms) {
             $options['maximumTerms'] = $maxTerms;
         }
 
@@ -160,10 +160,10 @@ class Connector implements \Zend\Log\LoggerAwareInterface
                          'query' => $query,
                          'startRecord' => ($start) ? $start : 1,
                          'recordSchema' => $schema];
-        if (!is_null($limit)) {
+        if (null !== $limit) {
             $options['maximumRecords'] = $limit;
         }
-        if (!is_null($sortBy)) {
+        if (null !== $sortBy) {
             $options['sortKeys'] = $sortBy;
         }
 
@@ -173,7 +173,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * Check for HTTP errors in a response.
      *
-     * @param \Zend\Http\Response $result The response to check.
+     * @param \Laminas\Http\Response $result The response to check.
      *
      * @throws BackendException
      * @return void

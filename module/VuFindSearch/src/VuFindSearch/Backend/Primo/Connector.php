@@ -3,7 +3,7 @@
 /**
  * Primo Central connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,33 +18,38 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Spencer Lamm <slamm1@swarthmore.edu>
  * @author   Anna Headley <aheadle1@swarthmore.edu>
  * @author   Chelsea Lobdell <clobdel1@swarthmore.edu>
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Ere Maijala <ere.maijala@helsinki.fi>
+ * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\Primo;
-use Zend\Http\Client as HttpClient;
+
+use Laminas\Http\Client as HttpClient;
 
 /**
  * Primo Central connector.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Spencer Lamm <slamm1@swarthmore.edu>
  * @author   Anna Headley <aheadle1@swarthmore.edu>
  * @author   Chelsea Lobdell <clobdel1@swarthmore.edu>
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Ere Maijala <ere.maijala@helsinki.fi>
+ * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class Connector implements \Zend\Log\LoggerAwareInterface
+class Connector implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
@@ -70,32 +75,53 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     protected $host;
 
     /**
-     * Debug status
+     * Response for an empty search
      *
-     * @var bool
+     * @var array
      */
-    public $debug = false;
+    protected static $emptyQueryResponse = [
+        'recordCount' => 0,
+        'documents' => [],
+        'facets' => [],
+        'error' => 'empty_search_disallowed'
+    ];
+
+    /**
+     * Regular expression to match highlighted terms
+     *
+     * @var string
+     */
+    protected $highlightRegEx = '{<span[^>]*>([^<]*?)</span>}si';
 
     /**
      * Constructor
      *
      * Sets up the Primo API Client
      *
-     * @param string     $apiId  Primo API ID
+     * @param string     $url    Primo API URL (either a host name and port or a full
+     * path to the brief search including a trailing question mark)
      * @param string     $inst   Institution code
      * @param HttpClient $client HTTP client
-     * @param int        $port   API connection port
      */
-    public function __construct($apiId, $inst, $client, $port = 1701)
+    public function __construct($url, $inst, $client)
     {
-        $this->host = "http://$apiId.hosted.exlibrisgroup.com:{$port}/"
-            . "PrimoWebServices/xservice/search/brief?";
+        $parts = parse_url($url);
+        if (empty($parts['path']) || $parts['path'] == '/') {
+            $parts['path'] = '/PrimoWebServices/xservice/search/brief';
+        }
+        $this->host = $parts['scheme'] . '://' . $parts['host']
+            . (!empty($parts['port']) ? ':' . $parts['port'] : '')
+            . $parts['path'] . '?';
+        if (!empty($parts['query'])) {
+            $this->host .= $parts['query'] . '&';
+        }
+
         $this->inst = $inst;
         $this->client = $client;
     }
 
     /**
-     * Execute a search.  adds all the querystring parameters into
+     * Execute a search. Adds all the querystring parameters into
      * $this->client and returns the parsed response
      *
      * @param string $institution Institution
@@ -110,13 +136,13 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      *     pageNumber  string: index of first record (default 1)
      *     limit       string: number of records to return (default 20)
      *     sort        string: value to be used by for sorting (default null)
-     *     returnErr   bool:   false to fail on error; true to return empty
-     *                         empty result set with an error field (def true)
+     *     highlight   bool:   whether to highlight search term matches in records
+     *     highlightStart string: Prefix for a highlighted term
+     *     highlightEnd   string: Suffix for a Highlighted term
      *     Anything in $params not listed here will be ignored.
      *
      * Note: some input parameters accepted by Primo are not implemented here:
      *  - dym (did you mean)
-     *  - highlight
      *  - more (get more)
      *  - lang (specify input language so engine can do lang. recognition)
      *  - displayField (has to do with highlighting somehow)
@@ -138,28 +164,15 @@ class Connector implements \Zend\Log\LoggerAwareInterface
             "pageNumber" => 1,
             "limit" => 20,
             "sort" => null,
-            "returnErr" => true,
+            "highlight" => false,
+            "highlightStart" => '',
+            "highlightEnd" => '',
         ];
         if (isset($params)) {
             $args = array_merge($args, $params);
         }
 
-        // run search, deal with exceptions
-        try {
-            $result = $this->performSearch($institution, $terms, $args);
-        } catch (\Exception $e) {
-            if ($args["returnErr"]) {
-                $this->debug($e->getMessage());
-                return [
-                    'recordCount' => 0,
-                    'documents' => [],
-                    'facets' => [],
-                    'error' => $e->getMessage()
-                ];
-            } else {
-                throw $e;
-            }
-        }
+        $result = $this->performSearch($institution, $terms, $args);
         return $result;
     }
 
@@ -170,24 +183,8 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      * @param array  $terms       Associative array:
      *     index       string: primo index to search (default "any")
      *     lookfor     string: actual search terms
-     * @param array  $args        Associative array of optional arguments:
-     *     phrase      bool:   true if it's a quoted phrase (default false)
-     *     onCampus    bool:   (default true)
-     *     didyoumean  bool:   (default false)
-     *     filterList  array:  (field, value) pairs to filter results (def null)
-     *     pageNumber  string: index of first record (default 1)
-     *     limit       string: number of records to return (default 20)
-     *     sort        string: value to be used by for sorting (default null)
-     *     returnErr   bool:   false to fail on error; true to return empty
-     *                         empty result set with an error field (def true)
-     *     Anything in $args   not listed here will be ignored.
-     *
-     * Note: some input parameters accepted by Primo are not implemented here:
-     *  - dym (did you mean)
-     *  - highlight
-     *  - more (get more)
-     *  - lang (specify input language so engine can do lang. recognition)
-     *  - displayField (has to do with highlighting somehow)
+     * @param array  $args        Associative array of optional arguments (see query
+     * method for more information)
      *
      * @throws \Exception
      * @return array             An array of query results
@@ -279,10 +276,27 @@ class Connector implements \Zend\Log\LoggerAwareInterface
             //     range facet control in the interface. look for injectPubDate
             if (!empty($args["filterList"])) {
                 foreach ($args["filterList"] as $facet => $values) {
-                    foreach ($values as $value) {
-                        $thisValue = preg_replace('/,/', '+', $value);
-                        $qs[] = "query=facet_" . $facet . ",exact,"
-                            . urlencode($thisValue);
+                    $facetOp = 'AND';
+                    if (isset($values['values'])) {
+                        $facetOp = $values['facetOp'];
+                        $values = $values['values'];
+                    }
+                    array_map(
+                        function ($value) {
+                            return urlencode(preg_replace('/,/', '+', $value));
+                        },
+                        $values
+                    );
+                    if ('OR' === $facetOp) {
+                        $qs[] = "query_inc=facet_$facet,exact," .
+                            implode(',', $values);
+                    } elseif ('NOT' === $facetOp) {
+                        $qs[] = "query_exc=facet_$facet,exact," .
+                            implode(',', $values);
+                    } else {
+                        foreach ($values as $value) {
+                            $qs[] = "query_inc=facet_$facet,exact,$value";
+                        }
                     }
                 }
             }
@@ -299,10 +313,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
             }
 
             // QUERYSTRING: indx (start record)
-            $recordStart = $args["pageNumber"];
-            if ($recordStart != 1) {
-                $recordStart = ($recordStart * 10) + 1;
-            }
+            $recordStart = ($args["pageNumber"] - 1) * $args['limit'] + 1;
             $qs[] = "indx=$recordStart";
 
             // TODO: put bulksize in conf file?  set a reasonable cap...
@@ -318,20 +329,19 @@ class Connector implements \Zend\Log\LoggerAwareInterface
                 $qs[] = "sortField=" . $args["sort"];
             }
 
+            // Highlighting
+            $qs[] = 'highlight=' . (empty($args['highlight']) ? 'false' : 'true');
+
             // QUERYSTRING: loc
             // all primocentral queries need this
             $qs[] = "loc=adaptor,primo_central_multiple_fe";
 
-            if ($this->debug) {
-                print "URL: " . implode('&', $qs);
-
-            }
-
             // Send Request
-            $result = $this->call(implode('&', $qs));
+            $result = $this->call(implode('&', $qs), $args);
         } else {
-            throw new \Exception('Primo API does not accept a null query');
+            return self::$emptyQueryResponse;
         }
+
         return $result;
     }
 
@@ -339,12 +349,13 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      * Small wrapper for sendRequest, process to simplify error handling.
      *
      * @param string $qs     Query string
+     * @param array  $params Request parameters
      * @param string $method HTTP method
      *
      * @return object    The parsed primo data
      * @throws \Exception
      */
-    protected function call($qs, $method = 'GET')
+    protected function call($qs, $params = [], $method = 'GET')
     {
         $this->debug("{$method}: {$this->host}{$qs}");
         $this->client->resetParameters();
@@ -360,17 +371,18 @@ class Connector implements \Zend\Log\LoggerAwareInterface
         if (!$result->isSuccess()) {
             throw new \Exception($result->getBody());
         }
-        return $this->process($result->getBody());
+        return $this->process($result->getBody(), $params);
     }
 
     /**
      * Translate Primo's XML into array of arrays.
      *
-     * @param array $data The raw xml from Primo
+     * @param array $data   The raw xml from Primo
+     * @param array $params Request parameters
      *
      * @return array      The processed response from Primo
      */
-    protected function process($data)
+    protected function process($data, $params = [])
     {
         // make sure data exists
         if (strlen($data) == 0) {
@@ -460,24 +472,11 @@ class Connector implements \Zend\Log\LoggerAwareInterface
             }
             $item['ispartof']
                 = (string)$prefix->PrimoNMBib->record->display->ispartof;
-            // description is sort of complicated
-            // TODO: sometimes the entire article is in the description.
+            // description is sort of complicated and will be processed after
+            // highlighting tags are handled.
             $description = isset($prefix->PrimoNMBib->record->display->description)
                 ? (string)$prefix->PrimoNMBib->record->display->description
                 : (string)$prefix->PrimoNMBib->record->search->description;
-            $description = trim(mb_substr($description, 0, 2500, 'UTF-8'));
-            // these may contain all kinds of metadata, and just stripping
-            //   tags mushes it all together confusingly.
-            $description = str_replace("P>", "p>", $description);
-            $d_arr = explode("<p>", $description);
-            foreach ($d_arr as &$value) {
-                // strip tags, trim so array_filter can get rid of
-                // entries that would just have spaces
-                $value = trim(strip_tags($value));
-            }
-            $d_arr = array_filter($d_arr);
-            // now all paragraphs are converted to linebreaks
-            $description = implode("<br>", $d_arr);
             $item['description'] = $description;
             // and the rest!
             $item['language']
@@ -535,6 +534,13 @@ class Connector implements \Zend\Log\LoggerAwareInterface
                     );
             };
             $item['issn'] = array_values(array_filter($item['issn'], $callback));
+
+            // Always process highlighting data as it seems Primo sometimes returns
+            // it (e.g. for CDI search) even if highlight parameter is set to false.
+            $this->processHighlighting($item, $params);
+
+            // Fix description now that highlighting is done:
+            $item['description'] = $this->processDescription($item['description']);
 
             $item['fullrecord'] = $prefix->PrimoNMBib->record->asXml();
             $items[] = $item;
@@ -595,27 +601,42 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      *
      * @param string $recordId  The document to retrieve from the Primo API
      * @param string $inst_code Institution code (optional)
+     * @param bool   $onCampus  Whether the user is on campus
      *
      * @throws \Exception
      * @return string    The requested resource
      */
-    public function getRecord($recordId, $inst_code = null)
+    public function getRecord($recordId, $inst_code = null, $onCampus = false)
     {
+        $this->currentParams = [];
         // Query String Parameters
         if (isset($recordId)) {
             $qs   = [];
-            $qs[] = 'query=rid,exact,"' . urlencode(addcslashes($recordId, '"'))
-                . '"';
+            // There is currently (at 2015-12-17) a problem with Primo fetching
+            // records that have colons in the id (e.g.
+            // doaj_xmloai:doaj.org/article:94935655971c4917aab4fcaeafeb67b9).
+            // According to Ex Libris support we must use contains search without
+            // quotes for the time being.
+            // Escaping the - character causes problems getting records like
+            // wj10.1111/j.1475-679X.2011.00421.x
+            $qs[] = 'query=rid,contains,'
+                . urlencode(addcslashes($recordId, '":()'));
             $qs[] = "institution=$inst_code";
-            $qs[] = "onCampus=true";
+            $qs[] = 'onCampus=' . ($onCampus ? 'true' : 'false');
             $qs[] = "indx=1";
             $qs[] = "bulkSize=1";
             $qs[] = "loc=adaptor,primo_central_multiple_fe";
+            // pcAvailability=true is needed for records, which
+            // are NOT in the PrimoCentral Holdingsfile.
+            // It won't hurt to have this parameter always set to true.
+            // But it'd hurt to have it not set in case you want to get
+            // a record, which is not in the Holdingsfile.
+            $qs[] = "pcAvailability=true";
 
             // Send Request
             $result = $this->call(implode('&', $qs));
         } else {
-            throw new \Exception('Primo API does not accept a null query');
+            return self::$emptyQueryResponse;
         }
 
         return $result;
@@ -626,15 +647,17 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      *
      * @param array  $recordIds The documents to retrieve from the Primo API
      * @param string $inst_code Institution code (optional)
+     * @param bool   $onCampus  Whether the user is on campus
      *
      * @throws \Exception
      * @return string    The requested resource
      */
-    public function getRecords($recordIds, $inst_code = null)
+    public function getRecords($recordIds, $inst_code = null, $onCampus = false)
     {
+        $this->currentParams = [];
         // Callback function for formatting IDs:
-        $formatIds = function ($i) {
-            return '"' . addcslashes($i, '"') . '"';
+        $formatIds = function ($id) {
+            return addcslashes($id, '":()');
         };
 
         // Query String Parameters
@@ -643,15 +666,21 @@ class Connector implements \Zend\Log\LoggerAwareInterface
             $recordIds = array_map($formatIds, $recordIds);
             $qs[] = 'query=rid,contains,' . urlencode(implode(' OR ', $recordIds));
             $qs[] = "institution=$inst_code";
-            $qs[] = "onCampus=true";
+            $qs[] = 'onCampus=' . ($onCampus ? 'true' : 'false');
             $qs[] = "indx=1";
             $qs[] = "bulkSize=" . count($recordIds);
             $qs[] = "loc=adaptor,primo_central_multiple_fe";
+            // pcAvailability=true is needed for records, which
+            // are NOT in the PrimoCentral Holdingsfile.
+            // It won't hurt to have this parameter always set to true.
+            // But it'd hurt to have it not set in case you want to get
+            // a record, which is not in the Holdingsfile.
+            $qs[] = "pcAvailability=true";
 
             // Send Request
             $result = $this->call(implode('&', $qs));
         } else {
-            throw new \Exception('Primo API does not accept a null query');
+            return self::$emptyQueryResponse;
         }
 
         return $result;
@@ -666,5 +695,104 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     public function getInstitutionCode()
     {
         return $this->inst;
+    }
+
+    /**
+     * Process highlighting tags of the record fields
+     *
+     * @param array $record Record data
+     * @param array $params Request params
+     *
+     * @return void
+     */
+    protected function processHighlighting(&$record, $params)
+    {
+        $highlight = !empty($params['highlight']);
+        $startTag = $params['highlightStart'] ?? '';
+        $endTag = $params['highlightEnd'] ?? '';
+
+        $highlightFields = [
+            'title' => 'title',
+            'creator' => 'author',
+            'description' => 'description'
+        ];
+
+        $hilightDetails = [];
+        foreach ($record as $field => $fieldData) {
+            $values = (array)$fieldData;
+
+            // Collect highlighting details:
+            if (isset($highlightFields[$field])) {
+                $highlightedValues = [];
+                foreach ($values as $value) {
+                    $count = 0;
+                    $value = preg_replace(
+                        $this->highlightRegEx,
+                        "$startTag$1$endTag",
+                        $value,
+                        -1,
+                        $count
+                    );
+                    if ($count) {
+                        // Account for double tags. Yes, it's possible.
+                        $value = preg_replace(
+                            $this->highlightRegEx,
+                            "$1",
+                            $value
+                        );
+                        $highlightedValues[] = $value;
+                    }
+                }
+                if ($highlightedValues) {
+                    $hilightDetails[$highlightFields[$field]] = $highlightedValues;
+                }
+            }
+
+            // Strip highlighting tags from all fields:
+            foreach ($values as &$value) {
+                $value = preg_replace(
+                    $this->highlightRegEx,
+                    "$1",
+                    $value
+                );
+                // Account for double tags. Yes, it's possible.
+                $value = preg_replace(
+                    $this->highlightRegEx,
+                    "$1",
+                    $value
+                );
+            }
+            $record[$field] = is_array($fieldData) ? $values : $values[0];
+
+            if ($highlight) {
+                $record['highlightDetails'] = $hilightDetails;
+            }
+        }
+    }
+
+    /**
+     * Fix the description field by removing tags etc.
+     *
+     * @param string $description Description
+     *
+     * @return string
+     */
+    protected function processDescription($description)
+    {
+        // Sometimes the entire article is in the description, so just take a chunk
+        // from the beginning.
+        $description = trim(mb_substr($description, 0, 2500, 'UTF-8'));
+        // These may contain all kinds of metadata, and just stripping
+        // tags mushes it all together confusingly.
+        $description = str_replace('<P>', '<p>', $description);
+        $paragraphs = explode('<p>', $description);
+        foreach ($paragraphs as &$value) {
+            // Strip tags, trim so array_filter can get rid of
+            // entries that would just have spaces
+            $value = trim(strip_tags($value));
+        }
+        $paragraphs = array_filter($paragraphs);
+        // Now join paragraphs using line breaks
+        return implode('<br>', $paragraphs);
     }
 }

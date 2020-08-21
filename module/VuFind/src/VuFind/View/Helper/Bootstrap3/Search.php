@@ -2,7 +2,7 @@
 /**
  * Helper class for displaying search-related HTML chunks.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Bootstrap3;
 
 /**
  * Helper class for displaying search-related HTML chunks.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Search extends \VuFind\View\Helper\AbstractSearch
 {
@@ -51,14 +51,15 @@ class Search extends \VuFind\View\Helper\AbstractSearch
     /**
      * Render an expand link.
      *
-     * @param string                          $url  Link href
-     * @param \Zend\View\Renderer\PhpRenderer $view View renderer object
+     * @param string                             $url  Link href
+     * @param \Laminas\View\Renderer\PhpRenderer $view View renderer object
      *
      * @return string
      */
     protected function renderExpandLink($url, $view)
     {
-        return '<a href="' . $url . '" title="' . $view->transEsc('spell_expand_alt')
-            . '"><i class="icon-circle-arrow-right"></i></a>';
+        return ' <a href="' . $url
+            . '" title="' . $view->transEsc('spell_expand_alt')
+            . '">(' . $view->transEsc('spell_expand_alt') . ')</a>';
     }
 }

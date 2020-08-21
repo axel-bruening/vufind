@@ -2,7 +2,7 @@
 /**
  * Generic VuFind table gateway.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,83 +17,80 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Db\Table;
-use Zend\Db\TableGateway\AbstractTableGateway,
-    Zend\Db\TableGateway\Feature,
-    Zend\ServiceManager\ServiceLocatorAwareInterface,
-    Zend\ServiceManager\ServiceLocatorInterface;
+
+use Laminas\Db\Adapter\Adapter;
+use Laminas\Db\TableGateway\AbstractTableGateway;
+use Laminas\Db\TableGateway\Feature;
+use VuFind\Db\Row\RowGateway;
 
 /**
  * Generic VuFind table gateway.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class Gateway extends AbstractTableGateway implements ServiceLocatorAwareInterface
+class Gateway extends AbstractTableGateway
 {
-    use \Zend\ServiceManager\ServiceLocatorAwareTrait;
-
     /**
-     * Name of class used to represent rows (null for default)
+     * Table manager
      *
-     * @var string
+     * @var PluginManager
      */
-    protected $rowClass = null;
-    
+    protected $tableManager;
+
     /**
      * Constructor
      *
-     * @param string $table    Name of database table to interface with
-     * @param string $rowClass Name of class used to represent rows (null for
-     * default)
+     * @param Adapter       $adapter Database adapter
+     * @param PluginManager $tm      Table manager
+     * @param array         $cfg     Laminas configuration
+     * @param RowGateway    $rowObj  Row prototype object (null for default)
+     * @param string        $table   Name of database table to interface with
      */
-    public function __construct($table, $rowClass = null)
-    {
-        $this->table = $table;
-        $this->rowClass = $rowClass;
-    }
-
-    /**
-     * Set database adapter
-     *
-     * @param \Zend\Db\Adapter\Adapter $adapter Database adapter
-     *
-     * @return void
-     */
-    public function setAdapter(\Zend\Db\Adapter\Adapter $adapter)
-    {
+    public function __construct(Adapter $adapter, PluginManager $tm, $cfg,
+        ?RowGateway $rowObj, $table
+    ) {
         $this->adapter = $adapter;
+        $this->tableManager = $tm;
+        $this->table = $table;
+
+        $this->initializeFeatures($cfg);
+        $this->initialize();
+
+        if (null !== $rowObj) {
+            $resultSetPrototype = $this->getResultSetPrototype();
+            $resultSetPrototype->setArrayObjectPrototype($rowObj);
+        }
     }
 
     /**
-     * Initialize
+     * Initialize features
+     *
+     * @param array $cfg Laminas configuration
      *
      * @return void
      */
-    public function initialize()
+    public function initializeFeatures($cfg)
     {
-        if ($this->isInitialized) {
-            return;
-        }
-
         // Special case for PostgreSQL sequences:
         if ($this->adapter->getDriver()->getDatabasePlatformName() == "Postgresql") {
-            $cfg = $this->getServiceLocator()->getServiceLocator()->get('config');
-            $maps = isset($cfg['vufind']['pgsql_seq_mapping'])
-                ? $cfg['vufind']['pgsql_seq_mapping'] : null;
+            $maps = $cfg['vufind']['pgsql_seq_mapping'] ?? null;
             if (isset($maps[$this->table])) {
-                $this->featureSet = new Feature\FeatureSet();
+                if (!is_object($this->featureSet)) {
+                    $this->featureSet = new Feature\FeatureSet();
+                }
                 $this->featureSet->addFeature(
                     new Feature\SequenceFeature(
                         $maps[$this->table][0], $maps[$this->table][1]
@@ -101,31 +98,6 @@ class Gateway extends AbstractTableGateway implements ServiceLocatorAwareInterfa
                 );
             }
         }
-
-        parent::initialize();
-        if (null !== $this->rowClass) {
-            $resultSetPrototype = $this->getResultSetPrototype();
-            $resultSetPrototype->setArrayObjectPrototype(
-                $this->initializeRowPrototype()
-            );
-        }
-    }
-
-    /**
-     * Construct the prototype for rows.
-     *
-     * @return object
-     */
-    protected function initializeRowPrototype()
-    {
-        $prototype = new $this->rowClass($this->getAdapter());
-        if ($prototype instanceof ServiceLocatorAwareInterface) {
-            $prototype->setServiceLocator($this->getServiceLocator());
-        }
-        \VuFind\ServiceManager\Initializer::initInstance(
-            $prototype, $this->getServiceLocator()->getServiceLocator()
-        );
-        return $prototype;
     }
 
     /**
@@ -135,7 +107,7 @@ class Gateway extends AbstractTableGateway implements ServiceLocatorAwareInterfa
      */
     public function createRow()
     {
-        $obj = clone($this->getResultSetPrototype()->getArrayObjectPrototype());
+        $obj = clone $this->getResultSetPrototype()->getArrayObjectPrototype();
 
         // If this is a PostgreSQL connection, we may need to initialize the ID
         // from a sequence:
@@ -145,7 +117,7 @@ class Gateway extends AbstractTableGateway implements ServiceLocatorAwareInterfa
         ) {
             // Do we have a sequence feature?
             $feature = $this->featureSet->getFeatureByClassName(
-                'Zend\Db\TableGateway\Feature\SequenceFeature'
+                'Laminas\Db\TableGateway\Feature\SequenceFeature'
             );
             if ($feature) {
                 $key = $obj->getPrimaryKeyColumn();
@@ -169,6 +141,6 @@ class Gateway extends AbstractTableGateway implements ServiceLocatorAwareInterfa
      */
     public function getDbTable($table)
     {
-        return $this->getServiceLocator()->get($table);
+        return $this->tableManager->get($table);
     }
 }

@@ -2,7 +2,7 @@
 /**
  * SOLR backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,47 +17,48 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\Solr;
 
-use VuFindSearch\Query\AbstractQuery;
-use VuFindSearch\Query\Query;
-
-use VuFindSearch\ParamBag;
-
-use VuFindSearch\Response\RecordCollectionInterface;
-use VuFindSearch\Response\RecordCollectionFactoryInterface;
-
-use VuFindSearch\Backend\Solr\Response\Json\Terms;
-
 use VuFindSearch\Backend\AbstractBackend;
-use VuFindSearch\Feature\SimilarInterface;
-use VuFindSearch\Feature\RetrieveBatchInterface;
-use VuFindSearch\Feature\RandomInterface;
-
 use VuFindSearch\Backend\Exception\BackendException;
+
 use VuFindSearch\Backend\Exception\RemoteErrorException;
 
+use VuFindSearch\Backend\Solr\Response\Json\Terms;
 use VuFindSearch\Exception\InvalidArgumentException;
+use VuFindSearch\Feature\GetIdsInterface;
+use VuFindSearch\Feature\RandomInterface;
+
+use VuFindSearch\Feature\RetrieveBatchInterface;
+use VuFindSearch\Feature\SimilarInterface;
+use VuFindSearch\ParamBag;
+use VuFindSearch\Query\AbstractQuery;
+
+use VuFindSearch\Query\Query;
+use VuFindSearch\Response\RecordCollectionFactoryInterface;
+
+use VuFindSearch\Response\RecordCollectionInterface;
 
 /**
  * SOLR backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class Backend extends AbstractBackend
-    implements SimilarInterface, RetrieveBatchInterface, RandomInterface
+    implements SimilarInterface, RetrieveBatchInterface, RandomInterface,
+    GetIdsInterface
 {
     /**
      * Connector.
@@ -72,6 +73,13 @@ class Backend extends AbstractBackend
      * @var QueryBuilder
      */
     protected $queryBuilder = null;
+
+    /**
+     * Similar records query builder.
+     *
+     * @var SimilarBuilder
+     */
+    protected $similarBuilder = null;
 
     /**
      * Constructor.
@@ -90,8 +98,8 @@ class Backend extends AbstractBackend
      * Perform a search and return record collection.
      *
      * @param AbstractQuery $query  Search query
-     * @param integer       $offset Search offset
-     * @param integer       $limit  Search limit
+     * @param int           $offset Search offset
+     * @param int           $limit  Search limit
      * @param ParamBag      $params Search backend parameters
      *
      * @return RecordCollectionInterface
@@ -113,10 +121,37 @@ class Backend extends AbstractBackend
     }
 
     /**
+     * Perform a search and return record collection of only record identifiers.
+     *
+     * @param AbstractQuery $query  Search query
+     * @param int           $offset Search offset
+     * @param int           $limit  Search limit
+     * @param ParamBag      $params Search backend parameters
+     *
+     * @return RecordCollectionInterface
+     */
+    public function getIds(AbstractQuery $query, $offset, $limit,
+        ParamBag $params = null
+    ) {
+        $params = $params ?: new ParamBag();
+        $this->injectResponseWriter($params);
+
+        $params->set('rows', $limit);
+        $params->set('start', $offset);
+        $params->set('fl', $this->getConnector()->getUniqueKey());
+        $params->mergeWith($this->getQueryBuilder()->build($query));
+        $response   = $this->connector->search($params);
+        $collection = $this->createRecordCollection($response);
+        $this->injectSourceIdentifier($collection);
+
+        return $collection;
+    }
+
+    /**
      * Get Random records
      *
      * @param AbstractQuery $query  Search query
-     * @param integer       $limit  Search limit
+     * @param int           $limit  Search limit
      * @param ParamBag      $params Search backend parameters
      *
      * @return RecordCollectionInterface
@@ -211,6 +246,7 @@ class Backend extends AbstractBackend
         $params = $params ?: new ParamBag();
         $this->injectResponseWriter($params);
 
+        $params->mergeWith($this->getSimilarBuilder()->build($id, $params));
         $response   = $this->connector->similar($id, $params);
         $collection = $this->createRecordCollection($response);
         $this->injectSourceIdentifier($collection);
@@ -227,20 +263,43 @@ class Backend extends AbstractBackend
      *
      * @return Terms
      */
-    public function terms($field, $start, $limit, ParamBag $params = null)
-    {
+    public function terms($field = null, $start = null, $limit = null,
+        ParamBag $params = null
+    ) {
+        // Support alternate syntax with ParamBag as first parameter:
+        if ($field instanceof ParamBag && $params === null) {
+            $params = $field;
+            $field = null;
+        }
+
+        // Create empty ParamBag if none provided:
         $params = $params ?: new ParamBag();
         $this->injectResponseWriter($params);
 
+        // Always enable terms:
         $params->set('terms', 'true');
-        $params->set('terms.fl', $field);
-        $params->set('terms.lower', $start);
-        $params->set('terms.limit', $limit);
-        $params->set('terms.lower.incl', 'false');
-        $params->set('terms.sort', 'index');
+
+        // Use parameters if provided:
+        if (null !== $field) {
+            $params->set('terms.fl', $field);
+        }
+        if (null !== $start) {
+            $params->set('terms.lower', $start);
+        }
+        if (null !== $limit) {
+            $params->set('terms.limit', $limit);
+        }
+
+        // Set defaults unless overridden:
+        if (!$params->hasParam('terms.lower.incl')) {
+            $params->set('terms.lower.incl', 'false');
+        }
+        if (!$params->hasParam('terms.sort')) {
+            $params->set('terms.sort', 'index');
+        }
 
         $response = $this->connector->terms($params);
-        $terms    = new Terms($this->deserialize($response));
+        $terms = new Terms($this->deserialize($response));
         return $terms;
     }
 
@@ -305,6 +364,33 @@ class Backend extends AbstractBackend
     }
 
     /**
+     * Set the similar records query builder.
+     *
+     * @param SimilarBuilder $similarBuilder Similar builder
+     *
+     * @return void
+     */
+    public function setSimilarBuilder(SimilarBuilder $similarBuilder)
+    {
+        $this->similarBuilder = $similarBuilder;
+    }
+
+    /**
+     * Return similar records query builder.
+     *
+     * Lazy loads an empty default SimilarBuilder if none was set.
+     *
+     * @return SimilarBuilder
+     */
+    public function getSimilarBuilder()
+    {
+        if (!$this->similarBuilder) {
+            $this->similarBuilder = new SimilarBuilder();
+        }
+        return $this->similarBuilder;
+    }
+
+    /**
      * Return the record collection factory.
      *
      * Lazy loads a generic collection factory.
@@ -362,8 +448,7 @@ class Backend extends AbstractBackend
                 sprintf('JSON decoding error: %s -- %s', $error, $json)
             );
         }
-        $qtime = isset($response['responseHeader']['QTime'])
-            ? $response['responseHeader']['QTime'] : 'n/a';
+        $qtime = $response['responseHeader']['QTime'] ?? 'n/a';
         $this->log('debug', 'Deserialized SOLR response', ['qtime' => $qtime]);
         return $response;
     }
@@ -384,7 +469,7 @@ class Backend extends AbstractBackend
         ) {
             throw new RemoteErrorException(
                 "Alphabetic Browse index missing.  See " .
-                "http://vufind.org/wiki/alphabetical_heading_browse for " .
+                "https://vufind.org/wiki/indexing:alphabetical_heading_browse for " .
                 "details on generating the index.",
                 $e->getCode(), $e->getResponse(), $e->getPrevious()
             );

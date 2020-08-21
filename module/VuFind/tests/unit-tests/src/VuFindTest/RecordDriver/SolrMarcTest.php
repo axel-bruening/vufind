@@ -2,7 +2,7 @@
 /**
  * SolrMarc Record Driver Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   Preetha Rao <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\RecordDriver;
 
 /**
  * SolrMarc Record Driver Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @author   David Maus <maus@hab.de>
  * @author   Preetha Rao <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class SolrMarcTest extends \VuFindTest\Unit\TestCase
 {
@@ -54,13 +54,13 @@ class SolrMarcTest extends \VuFindTest\Unit\TestCase
     public function testBug1()
     {
         $configArr = ['Record' => ['marc_links' => '760,765,770,772,774,773,775,777,780,785']];
-        $config = new \Zend\Config\Config($configArr);
+        $config = new \Laminas\Config\Config($configArr);
         $record = new \VuFind\RecordDriver\SolrMarc($config);
         $fixture = $this->loadRecordFixture('testbug1.json');
         $record->setRawData($fixture['response']['docs'][0]);
         $expected = [
-            ['title' => 'note_785_1', 'value' => 'Bollettino della Unione matematica italiana', 'link' => ['type' => 'bib', 'value' => '000343528']],
-            ['title' => 'note_785_1', 'value' => 'Bollettino della Unione matematica', 'link' => ['type' => 'bib', 'value' => '000343529']],
+            ['title' => 'A', 'value' => 'Bollettino della Unione matematica italiana', 'link' => ['type' => 'bib', 'value' => '000343528']],
+            ['title' => 'B', 'value' => 'Bollettino della Unione matematica', 'link' => ['type' => 'bib', 'value' => '000343529']],
             ['title' => 'note_785_8', 'value' => 'Bollettino della Unione matematica italiana', 'link' => ['type' => 'bib', 'value' => '000394898']],
         ];
         $this->assertEquals($expected, $record->getAllRecordLinks());
@@ -91,6 +91,72 @@ class SolrMarcTest extends \VuFindTest\Unit\TestCase
             'Vico, Giambattista, 1668-1744. Works. 1982 ;', $series[0]['name']
         );
         $this->assertEquals('2, pt. 1.', $series[0]['number']);
+    }
+
+    /**
+     * Test regular and extended subject heading support.
+     *
+     * @return void
+     */
+    public function testSubjectHeadings()
+    {
+        $config = new \Laminas\Config\Config([]);
+        $record = new \VuFind\RecordDriver\SolrMarc($config);
+        $fixture = $this->loadRecordFixture('testbug1.json');
+        $record->setRawData($fixture['response']['docs'][0]);
+        $this->assertEquals(
+            [['Matematica', 'Periodici.']],
+            $record->getAllSubjectHeadings()
+        );
+        $this->assertEquals(
+            [
+                [
+                    'heading' => ['Matematica', 'Periodici.'],
+                    'type' => '',
+                    'source' => ''
+                ],
+            ],
+            $record->getAllSubjectHeadings(true)
+        );
+    }
+
+    /**
+     * Test getFormattedMarcDetails() method.
+     *
+     * @return void
+     */
+    public function testGetFormattedMarcDetails()
+    {
+        $config = new \Laminas\Config\Config([]);
+        $record = new \VuFind\RecordDriver\SolrMarc($config);
+        $fixture = $this->loadRecordFixture('testbug1.json');
+        $record->setRawData($fixture['response']['docs'][0]);
+        $input = [
+            'foo' => 'msg|true',
+            'bar' => 'msg|false',
+            'baz' => 'msg|xyzzy',
+            'null' => 'msg',
+            'title' => 'marc|a',
+            'default' => 'marc',
+            'emptySubfield' => 'marc|c',
+            'pub' => 'marc|abc|260',
+        ];
+        $this->assertEquals(
+            [
+                [
+                    'id' => '000105196',
+                    'foo' => true,
+                    'bar' => false,
+                    'null' => null,
+                    'baz' => 'xyzzy',
+                    'title' => 'Bollettino della Unione matematica italiana.',
+                    'default' => 'Bollettino della Unione matematica italiana.',
+                    'emptySubfield' => '',
+                    'pub' => 'Bologna : Zanichelli, 1922-1975.',
+                ]
+            ],
+            $record->getFormattedMarcDetails('245', $input)
+        );
     }
 
     /**

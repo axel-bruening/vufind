@@ -3,7 +3,7 @@
 /**
  * Unit tests for language helper.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2014.
  *
@@ -18,27 +18,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Controller;
 
+use Laminas\Config\Config;
 use VuFindDevTools\LanguageHelper;
-use Zend\Config\Config;
 
 /**
  * Unit tests for language helper.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class LanguageHelperTest extends \VuFindTest\Unit\TestCase
 {
@@ -90,7 +90,7 @@ class LanguageHelperTest extends \VuFindTest\Unit\TestCase
     {
         $config = new Config(['Languages' => ['en' => 'English']]);
         return new LanguageHelper(
-            $this->getMock('VuFind\I18n\Translator\Loader\ExtendedIni'),
+            $this->createMock(\VuFind\I18n\Translator\Loader\ExtendedIni::class),
             $config
         );
     }

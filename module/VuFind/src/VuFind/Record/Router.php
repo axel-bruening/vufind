@@ -2,7 +2,7 @@
 /**
  * Record route generator
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,51 +17,41 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Record
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Record;
 
 /**
  * Record route generator
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Record
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class Router
 {
     /**
-     * Record loader
-     *
-     * @var \VuFind\Record\Loader
-     */
-    protected $loader;
-
-    /**
      * VuFind configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config;
 
     /**
      * Constructor
      *
-     * @param \VuFind\Record\Loader $loader Record loader
-     * @param \Zend\Config\Config   $config VuFind configuration
+     * @param \Laminas\Config\Config $config VuFind configuration
      */
-    public function __construct(\VuFind\Record\Loader $loader,
-        \Zend\Config\Config $config
-    ) {
-        $this->loader = $loader;
+    public function __construct(\Laminas\Config\Config $config)
+    {
         $this->config = $config;
     }
 
@@ -85,28 +75,41 @@ class Router
      * @param \VuFind\RecordDriver\AbstractBase|string $driver Record driver
      * representing record to link to, or source|id pipe-delimited string
      * @param string                                   $tab    Action to access
+     * @param array                                    $query  Optional query params
      *
      * @return array
      */
-    public function getTabRouteDetails($driver, $tab = null)
+    public function getTabRouteDetails($driver, $tab = null, $query = [])
     {
         $route = $this->getRouteDetails(
             $driver, '', empty($tab) ? [] : ['tab' => $tab]
         );
+        // Add the options and query elements only if we need a query to avoid
+        // an empty element in the route definition:
+        if ($query) {
+            $route['options']['query'] = $query;
+        }
 
         // If collections are active and the record route was selected, we need
         // to check if the driver is actually a collection; if so, we should switch
         // routes.
-        if ('record' == $route['route']) {
-            if (isset($this->config->Collections->collections)
-                && $this->config->Collections->collections
-            ) {
+        if ($this->config->Collections->collections ?? false) {
+            $routeConfig = isset($this->config->Collections->route)
+                ? $this->config->Collections->route->toArray() : [];
+            $collectionRoutes
+                = array_merge(
+                    ['record' => 'collection',
+                     'search2record' => 'search2collection'],
+                    $routeConfig
+                );
+            $routeName = $route['route'];
+            if ($collectionRoute = ($collectionRoutes[$routeName] ?? null)) {
                 if (!is_object($driver)) {
-                    list($source, $id) = $this->extractSourceAndId($driver);
-                    $driver = $this->loader->load($id, $source);
-                }
-                if (true === $driver->tryMethod('isCollection')) {
-                    $route['route'] = 'collection';
+                    // Avoid loading the driver. Set a flag so that if the link is
+                    // used, record controller will check for redirection.
+                    $route['options']['query']['checkRoute'] = 1;
+                } elseif (true === $driver->tryMethod('isCollection')) {
+                    $route['route'] = $collectionRoute;
                 }
             }
         }
@@ -130,7 +133,7 @@ class Router
     ) {
         // Extract source and ID from driver or string:
         if (is_object($driver)) {
-            $source = $driver->getResourceSource();
+            $source = $driver->getSourceIdentifier();
             $id = $driver->getUniqueId();
         } else {
             list($source, $id) = $this->extractSourceAndId($driver);
@@ -142,11 +145,19 @@ class Router
 
         // Determine route based on naming convention (default VuFind route is
         // the exception to the rule):
-        $routeBase = ($source == 'VuFind')
+        $routeBase = ($source == DEFAULT_SEARCH_BACKEND)
             ? 'record' : strtolower($source . 'record');
 
+        // Disable path normalization since it can unencode e.g. encoded slashes in
+        // record id's
+        $options = [
+            'normalize_path' => false
+        ];
+
         return [
-            'params' => $params, 'route' => $routeBase . $routeSuffix
+            'params' => $params,
+            'route' => $routeBase . $routeSuffix,
+            'options' => $options
         ];
     }
 
@@ -162,7 +173,7 @@ class Router
     {
         $parts = explode('|', $driver, 2);
         if (count($parts) < 2) {
-            $source = 'VuFind';
+            $source = DEFAULT_SEARCH_BACKEND;
             $id = $parts[0];
         } else {
             $source = $parts[0];

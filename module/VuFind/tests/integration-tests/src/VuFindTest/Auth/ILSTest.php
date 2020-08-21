@@ -2,7 +2,7 @@
 /**
  * ILS authentication test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,52 +17,41 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Auth;
-use VuFind\Auth\ILS, VuFind\Db\Table\User;
+
+use Laminas\Stdlib\Parameters;
+use VuFind\Auth\ILS;
+use VuFind\Db\Table\User;
 
 /**
  * ILS authentication test class.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class ILSTest extends \VuFindTest\Unit\DbTestCase
 {
     use \VuFindTest\Unit\UserCreationTrait;
 
     /**
-     * Object to test
-     *
-     * @var ILS
-     */
-    protected $auth;
-
-    /**
-     * Mock ILS driver
-     *
-     * @var \VuFind\ILS\Driver\Sample
-     */
-    protected $driver;
-
-    /**
      * Standard setup method.
      *
-     * @return mixed
+     * @return void
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
-        return static::failIfUsersExist();
+        static::failIfUsersExist();
     }
 
     /**
@@ -70,29 +59,65 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
         // Give up if we're not running in CI:
         if (!$this->continuousIntegrationRunning()) {
-            return $this->markTestSkipped('Continuous integration not running.');
+            $this->markTestSkipped('Continuous integration not running.');
+            return;
         }
-        $this->driver = $this->getMock('VuFind\ILS\Driver\Sample');
-        $driverManager = new \VuFind\ILS\Driver\PluginManager();
-        $driverManager->setService('Sample', $this->driver);
-        $mockConfigReader = $this->getMock('VuFind\Config\PluginManager');
+    }
+
+    /**
+     * Get a mock ILS driver to test.
+     *
+     * @param string $type    Driver type to mock (default = Sample)
+     * @param array  $methods Methods to mock
+     *
+     * @return \VuFind\ILS\Driver\Sample
+     */
+    protected function getMockDriver($type = 'Sample', $methods = [])
+    {
+        return $this->getMockBuilder('VuFind\ILS\Driver\\' . $type)
+            ->disableOriginalConstructor()
+            ->setMethods($methods)
+            ->getMock();
+    }
+
+    /**
+     * Get the object to test.
+     *
+     * @param \VuFind\ILS\Driver\AbstractBase $driver Mock ILS driver to test with.
+     * @param array                           $patron Logged in patron for mock
+     * authenticator (null for none)
+     *
+     * @return \VuFind\Auth\ILS
+     */
+    protected function getAuth($driver = null, $patron = null)
+    {
+        if (empty($driver)) {
+            $driver = $this->getMockDriver();
+        }
+        $authenticator = $this->getMockILSAuthenticator($patron);
+        $driverManager = new \VuFind\ILS\Driver\PluginManager(
+            $this->getServiceManager()
+        );
+        $driverManager->setService('Sample', $driver);
+        $mockConfigReader = $this->createMock(\VuFind\Config\PluginManager::class);
         $mockConfigReader->expects($this->any())->method('get')
-            ->will($this->returnValue(new \Zend\Config\Config([])));
-        $this->auth = new \VuFind\Auth\ILS(
+            ->will($this->returnValue(new \Laminas\Config\Config([])));
+        $auth = new \VuFind\Auth\ILS(
             new \VuFind\ILS\Connection(
-                new \Zend\Config\Config(['driver' => 'Sample']),
+                new \Laminas\Config\Config(['driver' => 'Sample']),
                 $driverManager, $mockConfigReader
             ),
-            $this->getMockILSAuthenticator()
+            $authenticator
         );
-        $this->auth->setDbTableManager(
-            $this->getServiceManager()->get('VuFind\DbTablePluginManager')
+        $auth->setDbTableManager(
+            $this->getServiceManager()->get(\VuFind\Db\Table\PluginManager::class)
         );
-        $this->auth->getCatalog()->setDriver($this->driver);
+        $auth->getCatalog()->setDriver($driver);
+        return $auth;
     }
 
     /**
@@ -102,7 +127,7 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testCreateIsDisallowed()
     {
-        $this->assertFalse($this->auth->supportsCreation());
+        $this->assertFalse($this->getAuth()->supportsCreation());
     }
 
     /**
@@ -111,15 +136,15 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      *
      * @param array $overrides Associative array of parameters to override.
      *
-     * @return \Zend\Http\Request
+     * @return \Laminas\Http\Request
      */
     protected function getLoginRequest($overrides = [])
     {
         $post = $overrides + [
             'username' => 'testuser', 'password' => 'testpass'
         ];
-        $request = new \Zend\Http\Request();
-        $request->setPost(new \Zend\Stdlib\Parameters($post));
+        $request = new \Laminas\Http\Request();
+        $request->setPost(new \Laminas\Stdlib\Parameters($post));
         return $request;
     }
 
@@ -130,9 +155,10 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankUsername()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['username' => '']);
-        $this->auth->authenticate($request);
+        $this->getAuth()->authenticate($request);
     }
 
     /**
@@ -142,9 +168,10 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testLoginWithBlankPassword()
     {
-        $this->setExpectedException('VuFind\Exception\Auth');
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         $request = $this->getLoginRequest(['password' => '']);
-        $this->auth->authenticate($request);
+        $this->getAuth()->authenticate($request);
     }
 
     /**
@@ -154,14 +181,16 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      */
     public function testBadLoginResponse()
     {
+        $this->expectException(\VuFind\Exception\Auth::class);
+
         // VuFind requires the ILS driver to return a value in cat_username
         // by default -- if that is missing, we should fail.
         $response = [];
-        $this->driver->expects($this->once())->method('patronLogin')
+        $driver = $this->getMockDriver();
+        $driver->expects($this->once())->method('patronLogin')
             ->with($this->equalTo('testuser'), $this->equalTo('testpass'))
             ->will($this->returnValue($response));
-        $this->setExpectedException('VuFind\Exception\Auth');
-        $this->auth->authenticate($this->getLoginRequest());
+        $this->getAuth($driver)->authenticate($this->getLoginRequest());
     }
 
     /**
@@ -175,12 +204,150 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
             'cat_username' => 'testuser', 'cat_password' => 'testpass',
             'email' => 'user@test.com'
         ];
-        $this->driver->expects($this->once())->method('patronLogin')
+        $driver = $this->getMockDriver();
+        $driver->expects($this->once())->method('patronLogin')
             ->with($this->equalTo('testuser'), $this->equalTo('testpass'))
             ->will($this->returnValue($response));
-        $user = $this->auth->authenticate($this->getLoginRequest());
+        $user = $this->getAuth($driver)->authenticate($this->getLoginRequest());
         $this->assertEquals('testuser', $user->username);
         $this->assertEquals('user@test.com', $user->email);
+    }
+
+    /**
+     * Test failure caused by missing cat_id.
+     *
+     * @return void
+     */
+    public function testLoginWithMissingCatId()
+    {
+        $this->expectException(\VuFind\Exception\Auth::class);
+        $this->expectExceptionMessage('authentication_error_technical');
+
+        $response = [
+            'cat_username' => 'testuser', 'cat_password' => 'testpass',
+            'email' => 'user@test.com'
+        ];
+        $driver = $this->getMockDriver();
+        $driver->expects($this->once())->method('patronLogin')
+            ->with($this->equalTo('testuser'), $this->equalTo('testpass'))
+            ->will($this->returnValue($response));
+        $auth = $this->getAuth($driver);
+        // Configure the authenticator to look for a cat_id; since there is no
+        // cat_id in the response above, this will throw an exception.
+        $config = ['Authentication' => ['ILS_username_field' => 'cat_id']];
+        $auth->setConfig(new \Laminas\Config\Config($config));
+        $auth->authenticate($this->getLoginRequest());
+    }
+
+    /**
+     * Test updating a user's password with mismatched new password values.
+     *
+     * @return void
+     */
+    public function testUpdateUserPasswordWithEmptyValue()
+    {
+        $this->expectException(\VuFind\Exception\Auth::class);
+        $this->expectExceptionMessage('Password cannot be blank');
+
+        $patron = ['cat_username' => 'testuser'];
+        $request = $this->getLoginRequest(
+            [
+                'oldpwd' => 'foo',
+                'password' => '',
+                'password2' => '',
+            ]
+        );
+        $this->getAuth(null, $patron)->updatePassword($request);
+    }
+
+    /**
+     * Test updating a user's password with mismatched new password values.
+     *
+     * @return void
+     */
+    public function testUpdateUserPasswordWithoutLoggedInUser()
+    {
+        $this->expectException(\VuFind\Exception\Auth::class);
+        $this->expectExceptionMessage('authentication_error_technical');
+
+        $request = $this->getLoginRequest(
+            [
+                'oldpwd' => 'foo',
+                'password' => 'bar',
+                'password2' => 'bar',
+            ]
+        );
+        $this->getAuth()->updatePassword($request);
+    }
+
+    /**
+     * Test updating a user's password with mismatched new password values.
+     *
+     * @return void
+     */
+    public function testUpdateUserPasswordWithMismatch()
+    {
+        $this->expectException(\VuFind\Exception\Auth::class);
+        $this->expectExceptionMessage('Passwords do not match');
+
+        $request = $this->getLoginRequest(
+            [
+                'oldpwd' => 'foo',
+                'password' => 'pass',
+                'password2' => 'fail',
+            ]
+        );
+        $patron = ['cat_username' => 'testuser'];
+        $this->getAuth(null, $patron)->updatePassword($request);
+    }
+
+    /**
+     * Test updating a user's password.
+     *
+     * @return void
+     */
+    public function testUpdateUserPassword()
+    {
+        $request = $this->getLoginRequest(
+            [
+                'oldpwd' => 'foo',
+                'password' => 'newpass',
+                'password2' => 'newpass',
+            ]
+        );
+        $driver = $this->getMockDriver('Demo', ['changePassword']);
+        $driver->expects($this->once())->method('changePassword')
+            ->will($this->returnValue(['success' => true]));
+        $patron = ['cat_username' => 'testuser'];
+        $user = $this->getAuth($driver, $patron)->updatePassword($request);
+        $this->assertEquals('testuser', $user->username);
+        $this->assertEquals('newpass', $user->getCatPassword());
+    }
+
+    /**
+     * Test updating a user's password (identifying user with cat_id field).
+     *
+     * @return void
+     */
+    public function testUpdateUserPasswordUsingCatIdField()
+    {
+        $request = $this->getLoginRequest(
+            [
+                'oldpwd' => 'foo',
+                'password' => 'newpass',
+                'password2' => 'newpass',
+            ]
+        );
+        $driver = $this->getMockDriver('Demo', ['changePassword']);
+        $driver->expects($this->once())->method('changePassword')
+            ->will($this->returnValue(['success' => true]));
+        $patron = ['cat_username' => 'testuser', 'cat_id' => '1234'];
+        $auth = $this->getAuth($driver, $patron);
+        $config = ['Authentication' => ['ILS_username_field' => 'cat_id']];
+        $auth->setConfig(new \Laminas\Config\Config($config));
+        $user = $auth->updatePassword($request);
+        $this->assertEquals('1234', $user->username);
+        $this->assertEquals('newpass', $user->getCatPassword());
     }
 
     /**
@@ -188,20 +355,26 @@ class ILSTest extends \VuFindTest\Unit\DbTestCase
      *
      * @return void
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
-        static::removeUsers('testuser');
+        static::removeUsers(['1234', 'testuser']);
     }
 
     /**
      * Get mock ILS authenticator
      *
+     * @param array $patron Logged in patron to simulate (null for none).
+     *
      * @return \VuFind\Auth\ILSAuthenticator
      */
-    protected function getMockILSAuthenticator()
+    protected function getMockILSAuthenticator($patron = null)
     {
-        return $this->getMockBuilder('VuFind\Auth\ILSAuthenticator')
+        $mock = $this->getMockBuilder(\VuFind\Auth\ILSAuthenticator::class)
             ->disableOriginalConstructor()
+            ->setMethods(['storedCatalogLogin'])
             ->getMock();
+        $mock->expects($this->any())->method('storedCatalogLogin')
+            ->will($this->returnValue($patron));
+        return $mock;
     }
 }

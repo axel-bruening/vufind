@@ -2,7 +2,7 @@
 /**
  * Tag Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,34 +17,39 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Controller;
+
+use Laminas\ServiceManager\ServiceLocatorInterface;
+use VuFind\Exception\Forbidden as ForbiddenException;
 
 /**
  * Tag Controller
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class TagController extends AbstractSearch
 {
     /**
      * Constructor
+     *
+     * @param ServiceLocatorInterface $sm Service locator
      */
-    public function __construct()
+    public function __construct(ServiceLocatorInterface $sm)
     {
         $this->searchClassId = 'Tags';
-        parent::__construct();
+        parent::__construct($sm);
     }
 
     /**
@@ -55,9 +60,8 @@ class TagController extends AbstractSearch
     public function homeAction()
     {
         if (!$this->tagsEnabled()) {
-            throw new \Exception('Tags disabled');
+            throw new ForbiddenException('Tags disabled');
         }
-        return $this->resultsAction();
+        return parent::resultsAction();
     }
 }
-

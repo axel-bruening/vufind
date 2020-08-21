@@ -3,7 +3,7 @@
 /**
  * Unit tests for QueryGroup class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,30 +18,30 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Query;
 
+use PHPUnit\Framework\TestCase;
 use VuFindSearch\Query\Query;
 use VuFindSearch\Query\QueryGroup;
-use PHPUnit_Framework_TestCase;
 
 /**
  * Unit tests for QueryGroup class.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class QueryGroupTest extends PHPUnit_Framework_TestCase
+class QueryGroupTest extends TestCase
 {
     /**
      * Test containsTerm() method
@@ -88,6 +88,23 @@ class QueryGroupTest extends PHPUnit_Framework_TestCase
     }
 
     /**
+     * Test replaceTerm() method with and without normalization using complex input
+     *
+     * @return void
+     */
+    public function testReplaceTermWithNormalization()
+    {
+        // Without normalization we only replace the accented instance of "query":
+        $q = $this->getSampleQueryGroupWithWeirdCharacters();
+        $q->replaceTerm('quéry', 'quéstion', false);
+        $this->assertEquals('tést quéstion multi WORD query', $q->getAllTerms());
+        // With normalization, we replace both instances of "query":
+        $q = $this->getSampleQueryGroupWithWeirdCharacters();
+        $q->replaceTerm('quéry', 'quéstion', true);
+        $this->assertEquals('test quéstion multi word quéstion', $q->getAllTerms());
+    }
+
+    /**
      * Test QueryGroup cloning.
      *
      * @return void
@@ -95,7 +112,7 @@ class QueryGroupTest extends PHPUnit_Framework_TestCase
     public function testClone()
     {
         $q = $this->getSampleQueryGroup();
-        $qClone = clone($q);
+        $qClone = clone $q;
         $q->replaceTerm('query', 'question');
         $qClone->setOperator('AND');
         $this->assertEquals('test question multi word question', $q->getAllTerms());
@@ -122,14 +139,28 @@ class QueryGroupTest extends PHPUnit_Framework_TestCase
      * Test setting an invalid operator.
      *
      * @return void
-     *
-     * @expectedException        VuFindSearch\Exception\InvalidArgumentException
-     * @expectedExceptionMessage Unknown or invalid boolean operator: fizz
      */
     public function testIllegalOperator()
     {
+        $this->expectException(\VuFindSearch\Exception\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown or invalid boolean operator: fizz');
+
         $q = $this->getSampleQueryGroup();
         $q->setOperator('fizz');
+    }
+
+    /**
+     * Test detection of normalized terms.
+     *
+     * @return void
+     */
+    public function testContainsNormalizedTerm()
+    {
+        $q = $this->getSampleQueryGroupWithWeirdCharacters();
+        // regular contains will fail because of the accent:
+        $this->assertFalse($q->containsTerm('test'));
+        // normalized contains will succeed:
+        $this->assertTrue($q->containsNormalizedTerm('test'));
     }
 
     /**
@@ -142,6 +173,19 @@ class QueryGroupTest extends PHPUnit_Framework_TestCase
         $q1 = new Query('test');
         $q2 = new Query('query');
         $q3 = new Query('multi word query');
+        return new QueryGroup('OR', [$q1, $q2, $q3]);
+    }
+
+    /**
+     * Get a test object with uppercase and accents.
+     *
+     * @return QueryGroup
+     */
+    protected function getSampleQueryGroupWithWeirdCharacters()
+    {
+        $q1 = new Query('tést');
+        $q2 = new Query('Quéry');
+        $q3 = new Query('multi WORD query');
         return new QueryGroup('OR', [$q1, $q2, $q3]);
     }
 }

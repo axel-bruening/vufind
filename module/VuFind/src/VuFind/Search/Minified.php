@@ -2,7 +2,7 @@
 /**
  * VuFind Minified Search Object
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Search;
 
@@ -44,11 +44,11 @@ namespace VuFind\Search;
  * $searchObject = unserialize($search);
  * $searchObject->deminify($manager);
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Minified
 {
@@ -67,9 +67,21 @@ class Minified
     public $f = [];
 
     /**
+     * Hidden Filters
+     *
+     * @var array
+     */
+    public $hf = [];
+
+    /**
      * ID, start tIme, query Speed, Result total, search TYpe, search CLass id
      */
-    public $id, $i, $s, $r, $ty, $cl;
+    public $id;
+    public $i;
+    public $s;
+    public $r;
+    public $ty;
+    public $cl;
 
     /**
      * Constructor. Building minified object from the
@@ -95,7 +107,8 @@ class Minified
 
         // It would be nice to shorten filter fields too, but
         //      it would be a nightmare to maintain.
-        $this->f = $searchObject->getParams()->getFilters();
+        $this->f = $searchObject->getParams()->getRawFilters();
+        $this->hf = $searchObject->getParams()->getHiddenFilters();
     }
 
     /**
@@ -130,7 +143,7 @@ class Minified
         // search class ID for the object we're about to construct:
         if (!isset($this->cl)) {
             $fixType = true;    // by default, assume we need to fix type
-            switch($this->ty) {
+            switch ($this->ty) {
             case 'Summon':
             case 'SummonAdvanced':
                 $this->cl = 'Summon';

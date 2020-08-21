@@ -2,7 +2,7 @@
 /**
  * Hierarchy Tree Renderer for the JS_Tree plugin
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_Renderer
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 namespace VuFind\Hierarchy\TreeRenderer;
+
+use Laminas\Mvc\Controller\Plugin\Url as UrlPlugin;
 
 /**
  * Hierarchy Tree Renderer
  *
  * This is a helper class for producing hierarchy trees.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_Renderer
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 class JSTree extends AbstractBase
     implements \VuFind\I18n\Translator\TranslatorAwareInterface
@@ -46,18 +48,29 @@ class JSTree extends AbstractBase
     /**
      * Router plugin
      *
-     * @var \Zend\Mvc\Controller\Plugin\Url
+     * @var UrlPlugin
      */
     protected $router = null;
 
     /**
+     * Whether the collections functionality is enabled
+     *
+     * @var bool
+     */
+    protected $collectionsEnabled;
+
+    /**
      * Constructor
      *
-     * @param \Zend\Mvc\Controller\Plugin\Url $router Router plugin for urls
+     * @param UrlPlugin $router             Router plugin for
+     * urls
+     * @param bool      $collectionsEnabled Whether the collections functionality is
+     * enabled
      */
-    public function __construct(\Zend\Mvc\Controller\Plugin\Url $router)
+    public function __construct(UrlPlugin $router, $collectionsEnabled)
     {
         $this->router = $router;
+        $this->collectionsEnabled = $collectionsEnabled;
     }
 
     /**
@@ -92,8 +105,7 @@ class JSTree extends AbstractBase
             $hierarchies = [];
             foreach ($inHierarchies as $hierarchyTopID) {
                 if ($this->getDataSource()->supports($hierarchyTopID)) {
-                    $hierarchies[$hierarchyTopID] = isset($inHierarchiesTitle[$i])
-                        ? $inHierarchiesTitle[$i] : '';
+                    $hierarchies[$hierarchyTopID] = $inHierarchiesTitle[$i] ?? '';
                 }
                 $i++;
             }
@@ -168,7 +180,7 @@ class JSTree extends AbstractBase
      */
     protected function buildNodeArray($node, $context, $hierarchyID)
     {
-        $escaper = new \Zend\Escaper\Escaper('utf-8');
+        $escaper = new \Laminas\Escaper\Escaper('utf-8');
         $ret = [
             'id' => preg_replace('/\W/', '-', $node->id),
             'text' => $escaper->escapeHtml($node->title),
@@ -205,8 +217,12 @@ class JSTree extends AbstractBase
             return $this->getUrlFromRouteCache('collection', $node->id)
                 . '#tabnav';
         } else {
-            $url = $this->getUrlFromRouteCache($node->type, $node->id);
-            return $node->type == 'collection'
+            $type = $node->type;
+            if ('collection' === $type && !$this->collectionsEnabled) {
+                $type = 'record';
+            }
+            $url = $this->getUrlFromRouteCache($type, $node->id);
+            return $type === 'collection'
                 ? $url . '#tabnav'
                 : $url . '#tree-' . preg_replace('/\W/', '-', $node->id);
         }
@@ -234,9 +250,28 @@ class JSTree extends AbstractBase
                     'recordID' => '__record_id__'
                 ]
             ];
-            $cache[$route] = $this->router->fromRoute($route, $params, $options);
+            $cache[$route] = $this->router->fromRoute(
+                $this->getRouteNameFromDataSource($route), $params, $options
+            );
         }
-        return str_replace('__record_id__', $id, $cache[$route]);
+        return str_replace('__record_id__', urlencode($id), $cache[$route]);
+    }
+
+    /**
+     * Get route name from data source.
+     *
+     * @param string $route Route
+     *
+     * @return string
+     */
+    protected function getRouteNameFromDataSource($route)
+    {
+        if ($route === 'collection') {
+            return $this->getDataSource()->getCollectionRoute();
+        } elseif ($route === 'record') {
+            return $this->getDataSource()->getRecordRoute();
+        }
+        return $route;
     }
 
     /**
@@ -251,7 +286,7 @@ class JSTree extends AbstractBase
      */
     protected function jsonToHTML($node, $context, $hierarchyID, $recordID = false)
     {
-        $escaper = new \Zend\Escaper\Escaper('utf-8');
+        $escaper = new \Laminas\Escaper\Escaper('utf-8');
 
         $name = strlen($node->title) > 100
             ? substr($node->title, 0, 100) . '...'

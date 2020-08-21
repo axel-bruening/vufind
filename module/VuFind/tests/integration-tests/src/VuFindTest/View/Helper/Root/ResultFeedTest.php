@@ -2,7 +2,7 @@
 /**
  * ResultFeed Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Integration\View\Helper\Root;
+
 use VuFind\View\Helper\Root\ResultFeed;
 
 /**
  * ResultFeed Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class ResultFeedTest extends \VuFindTest\Unit\ViewHelperTestCase
 {
@@ -44,11 +45,12 @@ class ResultFeedTest extends \VuFindTest\Unit\ViewHelperTestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
         // Give up if we're not running in CI:
         if (!$this->continuousIntegrationRunning()) {
-            return $this->markTestSkipped('Continuous integration not running.');
+            $this->markTestSkipped('Continuous integration not running.');
+            return;
         }
     }
 
@@ -59,30 +61,45 @@ class ResultFeedTest extends \VuFindTest\Unit\ViewHelperTestCase
      */
     protected function getPlugins()
     {
-        $currentPath = $this->getMock('VuFind\View\Helper\Root\CurrentPath');
+        $currentPath = $this->createMock(\VuFind\View\Helper\Root\CurrentPath::class);
         $currentPath->expects($this->any())->method('__invoke')
             ->will($this->returnValue('/test/path'));
 
-        $recordLink = $this->getMock(
-            'VuFind\View\Helper\Root\RecordLink', [],
-            [new \VuFind\Record\Router(
-                $this->getServiceManager()->get('VuFind\RecordLoader'),
-                new \Zend\Config\Config([])
-            )
-            ]
-        );
+        $recordLink = $this->getMockBuilder(\VuFind\View\Helper\Root\RecordLink::class)
+            ->setConstructorArgs(
+                [
+                    new \VuFind\Record\Router(
+                        new \Laminas\Config\Config([])
+                    )
+                ]
+            )->getMock();
         $recordLink->expects($this->any())->method('getUrl')
             ->will($this->returnValue('test/url'));
 
-        $serverUrl = $this->getMock('Zend\View\Helper\ServerUrl');
+        $serverUrl = $this->createMock(\Laminas\View\Helper\ServerUrl::class);
         $serverUrl->expects($this->any())->method('__invoke')
             ->will($this->returnValue('http://server/url'));
 
         return [
-            'currentpath' => $currentPath,
-            'recordlink' => $recordLink,
+            'currentPath' => $currentPath,
+            'recordLink' => $recordLink,
             'serverurl' => $serverUrl
         ];
+    }
+
+    /**
+     * Mock out the translator.
+     *
+     * @return \Laminas\I18n\Translator\TranslatorInterface
+     */
+    protected function getMockTranslator()
+    {
+        $mock = $this->getMockBuilder(\Laminas\I18n\Translator\TranslatorInterface::class)
+            ->getMock();
+        $mock->expects($this->at(1))->method('translate')
+            ->with($this->equalTo('showing_results_of_html'), $this->equalTo('default'))
+            ->will($this->returnValue('Showing <strong>%%start%% - %%end%%</strong> results of <strong>%%total%%</strong>'));
+        return $mock;
     }
 
     /**
@@ -95,17 +112,19 @@ class ResultFeedTest extends \VuFindTest\Unit\ViewHelperTestCase
         // Set up a request -- we'll sort by title to ensure a predictable order
         // for the result list (relevance or last_indexed may lead to unstable test
         // cases).
-        $request = new \Zend\Stdlib\Parameters();
+        $request = new \Laminas\Stdlib\Parameters();
         $request->set('lookfor', 'id:testbug2 OR id:testsample1');
         $request->set('skip_rss_sort', 1);
         $request->set('sort', 'title');
         $request->set('view', 'rss');
 
         $results = $this->getServiceManager()
-            ->get('VuFind\SearchResultsPluginManager')->get('Solr');
+            ->get(\VuFind\Search\Results\PluginManager::class)->get('Solr');
         $results->getParams()->initFromRequest($request);
 
         $helper = new ResultFeed();
+        $helper->registerExtensions($this->getServiceManager());
+        $helper->setTranslator($this->getMockTranslator());
         $helper->setView($this->getPhpRenderer($this->getPlugins()));
         $feed = $helper->__invoke($results, '/test/path');
         $this->assertTrue(is_object($feed));
@@ -118,9 +137,9 @@ class ResultFeedTest extends \VuFindTest\Unit\ViewHelperTestCase
         $this->assertTrue(strstr($rss, 'dc:format') !== false);
 
         // Now re-parse it and check for some expected values:
-        $parsedFeed = \Zend\Feed\Reader\Reader::importString($rss);
+        $parsedFeed = \Laminas\Feed\Reader\Reader::importString($rss);
         $this->assertEquals(
-            'Showing 1-2 of 2', $parsedFeed->getDescription()
+            'Showing 1 - 2 results of 2', $parsedFeed->getDescription()
         );
         $items = [];
         $i = 0;

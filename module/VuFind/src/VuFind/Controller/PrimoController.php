@@ -2,7 +2,7 @@
 /**
  * Primo Central Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,44 +17,39 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Controller;
+
+use Laminas\ServiceManager\ServiceLocatorInterface;
 
 /**
  * Primo Central Controller
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class PrimoController extends AbstractSearch
 {
     /**
      * Constructor
-     */
-    public function __construct()
-    {
-        $this->searchClassId = 'Primo';
-        parent::__construct();
-    }
-
-    /**
-     * Home action
      *
-     * @return mixed
+     * @param ServiceLocatorInterface $sm Service locator
      */
-    public function homeAction()
+    public function __construct(ServiceLocatorInterface $sm)
     {
-        return $this->createViewModel();
+        $this->accessPermission = 'access.PrimoModule';
+        $this->searchClassId = 'Primo';
+        parent::__construct($sm);
     }
 
     /**
@@ -64,9 +59,10 @@ class PrimoController extends AbstractSearch
      */
     protected function resultScrollerActive()
     {
-        $config = $this->getServiceLocator()->get('VuFind\Config')->get('Primo');
-        return (isset($config->Record->next_prev_navigation)
-            && $config->Record->next_prev_navigation);
+        $config = $this->serviceLocator->get(\VuFind\Config\PluginManager::class)
+            ->get('Primo');
+        return isset($config->Record->next_prev_navigation)
+            && $config->Record->next_prev_navigation;
     }
 
     /**
@@ -79,4 +75,3 @@ class PrimoController extends AbstractSearch
         return $this->resultsAction();
     }
 }
-

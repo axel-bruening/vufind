@@ -2,7 +2,7 @@
 /**
  * Holdings (ILS) tab
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,44 +17,66 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 namespace VuFind\RecordTab;
+
+use VuFind\ILS\Connection;
 
 /**
  * Holdings (ILS) tab
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 class HoldingsILS extends AbstractBase
 {
     /**
-     * ILS connection (or false if not applicable)
+     * ILS connection (or null if not applicable)
      *
-     * @param \VuFind\ILS\Connection|bool
+     * @param Connection
      */
     protected $catalog;
 
     /**
+     * Name of template to use for rendering holdings.
+     *
+     * @param string
+     */
+    protected $template;
+
+    /**
+     * Whether the holdings tab should be hidden when empty or not.
+     *
+     * @var bool
+     */
+    protected $hideWhenEmpty;
+
+    /**
      * Constructor
      *
-     * @param \VuFind\ILS\Connection|bool $catalog ILS connection to use to check
-     * for holdings before displaying the tab; set to false if no check is needed
+     * @param \VuFind\ILS\Connection|bool $catalog       ILS connection to use to
+     * check for holdings before displaying the tab; may be set to null if no check
+     * is needed.
+     * @param string                      $template      Holdings template to use
+     * @param bool                        $hideWhenEmpty Whether the
+     * holdings tab should be hidden when empty or not
      */
-    public function __construct($catalog)
-    {
-        $this->catalog = ($catalog && $catalog instanceof \VuFind\ILS\Connection)
-            ? $catalog : false;
+    public function __construct(Connection $catalog = null, $template = null,
+        $hideWhenEmpty = false
+    ) {
+        $this->catalog = $catalog;
+        $this->template = $template ?? 'standard';
+        $this->hideWhenEmpty = $hideWhenEmpty;
     }
 
     /**
@@ -94,9 +116,46 @@ class HoldingsILS extends AbstractBase
      */
     public function isActive()
     {
-        if ($this->catalog) {
-            return $this->catalog->hasHoldings($this->driver->getUniqueID());
+        return ($this->catalog && $this->hideWhenEmpty)
+            ? $this->catalog->hasHoldings($this->driver->getUniqueID()) : true;
+    }
+
+    /**
+     * Get name of template for rendering holdings.
+     *
+     * @return string
+     */
+    public function getTemplate()
+    {
+        return $this->template;
+    }
+
+    /**
+     * Getting a paginator for the items list.
+     *
+     * @param int $totalItemCount Total count of items for a bib record
+     * @param int $page           Currently selected page of the items paginator
+     * @param int $itemLimit      Max. no of items per page
+     *
+     * @return \Laminas\Paginator\Paginator
+     */
+    public function getPaginator($totalItemCount, $page, $itemLimit)
+    {
+        // Return if a paginator is not needed or not supported ($itemLimit = null)
+        if (!$itemLimit || $totalItemCount < $itemLimit) {
+            return;
         }
-        return true;
+
+        // Create the paginator
+        $nullAdapter = new \Laminas\Paginator\Adapter\NullFill($totalItemCount);
+        $paginator = new \Laminas\Paginator\Paginator($nullAdapter);
+
+        // Some settings for the paginator
+        $paginator
+            ->setCurrentPageNumber($page)
+            ->setItemCountPerPage($itemLimit)
+            ->setPageRange(10);
+
+        return $paginator;
     }
 }

@@ -3,7 +3,7 @@
 /**
  * Unit tests for Primo connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,34 +18,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\Primo;
 
-use VuFindSearch\Backend\Primo\Connector;
-
-use Zend\Http\Client\Adapter\Test as TestAdapter;
-use Zend\Http\Client as HttpClient;
-
-use PHPUnit_Framework_TestCase;
 use InvalidArgumentException;
+
+use Laminas\Http\Client\Adapter\Test as TestAdapter;
+use Laminas\Http\Client as HttpClient;
+
+use PHPUnit\Framework\TestCase;
+use VuFindSearch\Backend\Primo\Connector;
 
 /**
  * Unit tests for Primo connector.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class ConnectorTest extends PHPUnit_Framework_TestCase
+class ConnectorTest extends TestCase
 {
     /**
      * Test default timeout value
@@ -81,7 +81,7 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
         $terms = [];
         $result = $conn->query('dummyinst', $terms);
         $this->assertEquals(0, $result['recordCount']);
-        $this->assertEquals('Primo API does not accept a null query', $result['error']);
+        $this->assertEquals('empty_search_disallowed', $result['error']);
     }
 
     /**
@@ -124,12 +124,12 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
      * status.
      *
      * @return void
-     *
-     * @expectedException        \Exception
-     * @expectedExceptionMessage Unauthorized access
      */
     public function testErrorInSuccessfulResponse()
     {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Unauthorized access');
+
         $conn = $this->createConnector('error-with-success-http');
         $terms = [
             ['index' => 'Title', 'lookfor' => 'dummy query'],
@@ -159,7 +159,7 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
         }
         $client = new HttpClient();
         $client->setAdapter($adapter);
-        $conn = new Connector('fakeid', 'fakeinst', $client);
+        $conn = new Connector('http://fakeaddress.none', 'fakeinst', $client);
         return $conn;
     }
 }

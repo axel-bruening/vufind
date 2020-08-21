@@ -1,41 +1,42 @@
 <?php
-return array(
+return [
     'extends' => 'root',
-    'css' => array(
+    'css' => [
         //'vendor/bootstrap.min.css',
         //'vendor/bootstrap-accessibility.css',
+        //'vendor/font-awesome.min.css',
         //'bootstrap-custom.css',
         'compiled.css',
-        'vendor/font-awesome.min.css',
-        'vendor/bootstrap-slider.css',
         'print.css:print',
-    ),
-    'js' => array(
-        'vendor/base64.js:lt IE 10', // btoa polyfill
+        'flex-fallback.css::lt IE 10', // flex polyfill
+    ],
+    'js' => [
         'vendor/jquery.min.js',
         'vendor/bootstrap.min.js',
         'vendor/bootstrap-accessibility.min.js',
-        //'vendor/bootlint.min.js',
-        'vendor/typeahead.js',
         'vendor/validator.min.js',
-        'vendor/rc4.js',
+        'lib/form-attr-polyfill.js', // input[form] polyfill, cannot load conditionally, since we need all versions of IE
+        'lib/autocomplete.js',
         'common.js',
         'lightbox.js',
-    ),
-    'less' => array(
+    ],
+    'less' => [
         'active' => false,
         'compiled.less'
-    ),
+    ],
     'favicon' => 'vufind-favicon.ico',
-    'helpers' => array(
-        'factories' => array(
-            'flashmessages' => 'VuFind\View\Helper\Bootstrap3\Factory::getFlashmessages',
-            'layoutclass' => 'VuFind\View\Helper\Bootstrap3\Factory::getLayoutClass',
-        ),
-        'invokables' => array(
+    'helpers' => [
+        'factories' => [
+            'VuFind\View\Helper\Bootstrap3\Flashmessages' => 'VuFind\View\Helper\Root\FlashmessagesFactory',
+            'VuFind\View\Helper\Bootstrap3\Highlight' => 'Laminas\ServiceManager\Factory\InvokableFactory',
+            'VuFind\View\Helper\Bootstrap3\LayoutClass' => 'VuFind\View\Helper\Bootstrap3\LayoutClassFactory',
+            'VuFind\View\Helper\Bootstrap3\Search' => 'Laminas\ServiceManager\Factory\InvokableFactory',
+        ],
+        'aliases' => [
+            'flashmessages' => 'VuFind\View\Helper\Bootstrap3\Flashmessages',
             'highlight' => 'VuFind\View\Helper\Bootstrap3\Highlight',
-            'search' => 'VuFind\View\Helper\Bootstrap3\Search',
-            'vudl' => 'VuDL\View\Helper\Bootstrap3\VuDL',
-        )
-    )
-);
+            'layoutClass' => 'VuFind\View\Helper\Bootstrap3\LayoutClass',
+            'search' => 'VuFind\View\Helper\Bootstrap3\Search'
+        ]
+    ]
+];

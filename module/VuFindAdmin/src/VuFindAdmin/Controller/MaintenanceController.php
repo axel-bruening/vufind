@@ -2,7 +2,7 @@
 /**
  * Admin Maintenance Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,36 +17,36 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFindAdmin\Controller;
 
 /**
  * Class helps maintain database
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Controller
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class MaintenanceController extends AbstractAdmin
 {
     /**
      * System Maintenance
      *
-     * @return \Zend\View\Model\ViewModel
+     * @return \Laminas\View\Model\ViewModel
      */
     public function homeAction()
     {
         $view = $this->createViewModel();
-        $view->caches = $this->getServiceLocator()->get('VuFind\CacheManager')
+        $view->caches = $this->serviceLocator->get(\VuFind\Cache\Manager::class)
             ->getCacheList();
         $view->setTemplate('admin/maintenance/home');
         return $view;
@@ -59,7 +59,7 @@ class MaintenanceController extends AbstractAdmin
      */
     public function clearcacheAction()
     {
-        $cacheManager = $this->getServiceLocator()->get('VuFind\CacheManager');
+        $cacheManager = $this->serviceLocator->get(\VuFind\Cache\Manager::class);
         foreach ($this->params()->fromQuery('cache', []) as $cache) {
             $cacheManager->getCache($cache)->flush();
         }

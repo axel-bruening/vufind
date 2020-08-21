@@ -3,7 +3,7 @@
 /**
  * Abstract base class for PHPUnit deferred recommendation module test cases.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,24 +18,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Unit;
 
 /**
  * Abstract base class for PHPUnit deferred recommendation module test cases.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 abstract class RecommendDeferredTestCase extends TestCase
 {
@@ -44,7 +44,7 @@ abstract class RecommendDeferredTestCase extends TestCase
      *
      * @param string                      $class    class to construct
      * @param string                      $settings settings
-     * @param \Zend\StdLib\Parameters     $request  request
+     * @param \Laminas\Stdlib\Parameters  $request  request
      * @param \VuFind\Search\Solr\Results $results  results object
      *
      * @return SideFacets
@@ -56,7 +56,7 @@ abstract class RecommendDeferredTestCase extends TestCase
             $results = $this->getMockResults();
         }
         if (null === $request) {
-            $request = new \Zend\StdLib\Parameters([]);
+            $request = new \Laminas\Stdlib\Parameters([]);
         }
         $mod = new $class();
         $mod->setConfig($settings);
@@ -77,7 +77,7 @@ abstract class RecommendDeferredTestCase extends TestCase
         if (null === $params) {
             $params = $this->getMockParams();
         }
-        $results = $this->getMockBuilder('VuFind\Search\Solr\Results')
+        $results = $this->getMockBuilder(\VuFind\Search\Solr\Results::class)
             ->disableOriginalConstructor()->getMock();
         $results->expects($this->any())->method('getParams')
             ->will($this->returnValue($params));
@@ -96,7 +96,7 @@ abstract class RecommendDeferredTestCase extends TestCase
         if (null === $query) {
             $query = new \VuFindSearch\Query\Query('foo', 'bar');
         }
-        $params = $this->getMockBuilder('VuFind\Search\Solr\Params')
+        $params = $this->getMockBuilder(\VuFind\Search\Solr\Params::class)
             ->disableOriginalConstructor()->getMock();
         $params->expects($this->any())->method('getQuery')
             ->will($this->returnValue($query));

@@ -2,7 +2,7 @@
 /**
  * VuFind Mailer Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2009.
  *
@@ -17,28 +17,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Mailer
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Mailer;
-use VuFind\Exception\Mail as MailException,
-    Zend\Mail\AddressList,
-    Zend\Mail\Message,
-    Zend\Mail\Header\ContentType;
+
+use Laminas\Mail\Address;
+use Laminas\Mail\AddressList;
+use Laminas\Mail\Header\ContentType;
+use Laminas\Mail\Message;
+use Laminas\Mail\Transport\TransportInterface;
+use Laminas\Mime\Message as MimeMessage;
+use Laminas\Mime\Mime;
+use Laminas\Mime\Part as MimePart;
+use VuFind\Exception\Mail as MailException;
 
 /**
  * VuFind Mailer Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Mailer
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
 {
@@ -47,7 +53,7 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     /**
      * Mail transport
      *
-     * @var \Zend\Mail\Transport\TransportInterface
+     * @var TransportInterface
      */
     protected $transport;
 
@@ -59,11 +65,18 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     protected $maxRecipients = 1;
 
     /**
+     * "From" address override
+     *
+     * @var string
+     */
+    protected $fromAddressOverride = '';
+
+    /**
      * Constructor
      *
-     * @param \Zend\Mail\Transport\TransportInterface $transport Mail transport
+     * @param TransportInterface $transport Mail transport
      */
-    public function __construct(\Zend\Mail\Transport\TransportInterface $transport)
+    public function __construct(TransportInterface $transport)
     {
         $this->setTransport($transport);
     }
@@ -71,7 +84,7 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     /**
      * Get the mail transport object.
      *
-     * @return \Zend\Mail\Transport\TransportInterface
+     * @return TransportInterface
      */
     public function getTransport()
     {
@@ -79,27 +92,52 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     }
 
     /**
-     * Get a blank email message object.
+     * Get a text email message object.
      *
      * @return Message
      */
     public function getNewMessage()
     {
-        $message = new Message();
-        $message->setEncoding('UTF-8');
+        $message = $this->getNewBlankMessage();
         $headers = $message->getHeaders();
         $ctype = new ContentType();
-        $ctype->setType('text/plain');
+        $ctype->setType(Mime::TYPE_TEXT);
         $ctype->addParameter('charset', 'UTF-8');
         $headers->addHeader($ctype);
         return $message;
     }
 
     /**
+     * Reset the connection in the transport. Implements a fluent interface.
+     *
+     * @return Mailer
+     */
+    public function resetConnection()
+    {
+        // If the transport has a disconnect method, call it:
+        $transport = $this->getTransport();
+        if (is_callable([$transport, 'disconnect'])) {
+            $transport->disconnect();
+        }
+        return $this;
+    }
+
+    /**
+     * Get a blank email message object.
+     *
+     * @return Message
+     */
+    public function getNewBlankMessage()
+    {
+        $message = new Message();
+        $message->setEncoding('UTF-8');
+        return $message;
+    }
+
+    /**
      * Set the mail transport object.
      *
-     * @param \Zend\Mail\Transport\TransportInterface $transport Mail transport
-     * object
+     * @param TransportInterface $transport Mail transport object
      *
      * @return void
      */
@@ -129,28 +167,73 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     }
 
     /**
+     * Constructs a {@see MimeMessage} body from given text and html content.
+     *
+     * @param string|null $text Mail content used for plain text part
+     * @param string|null $html Mail content used for html part
+     *
+     * @return MimeMessage
+     */
+    public function buildMultipartBody(
+        string $text = null,
+        string $html = null
+    ): MimeMessage {
+        $parts = new MimeMessage();
+
+        if ($text) {
+            $textPart = new MimePart($text);
+            $textPart->setType(Mime::TYPE_TEXT);
+            $textPart->setCharset('utf-8');
+            $textPart->setEncoding(Mime::ENCODING_QUOTEDPRINTABLE);
+            $parts->addPart($textPart);
+        }
+
+        if ($html) {
+            $htmlPart = new MimePart($html);
+            $htmlPart->setType(Mime::TYPE_HTML);
+            $htmlPart->setCharset('utf-8');
+            $htmlPart->setEncoding(Mime::ENCODING_QUOTEDPRINTABLE);
+            $parts->addPart($htmlPart);
+        }
+
+        $alternativePart = new MimePart($parts->generateMessage());
+        $alternativePart->setType('multipart/alternative');
+        $alternativePart->setBoundary($parts->getMime()->boundary());
+        $alternativePart->setCharset('utf-8');
+
+        $body = new MimeMessage();
+        $body->setParts([$alternativePart]);
+
+        return $body;
+    }
+
+    /**
      * Send an email message.
      *
-     * @param string $to      Recipient email address (or delimited list)
-     * @param string $from    Sender email address
-     * @param string $subject Subject line for message
-     * @param string $body    Message body
-     * @param string $cc      CC recipient (null for none)
+     * @param string|Address|AddressList $to      Recipient email address (or
+     * delimited list)
+     * @param string|Address             $from    Sender name and email address
+     * @param string                     $subject Subject line for message
+     * @param string|MimeMessage         $body    Message body
+     * @param string                     $cc      CC recipient (null for none)
+     * @param string|Address|AddressList $replyTo Reply-To address (or delimited
+     * list, null for none)
      *
      * @throws MailException
      * @return void
      */
-    public function send($to, $from, $subject, $body, $cc = null)
+    public function send($to, $from, $subject, $body, $cc = null, $replyTo = null)
     {
-        $recipients = $this->stringToAddressList($to);
+        $recipients = $this->convertToAddressList($to);
+        $replyTo = $this->convertToAddressList($replyTo);
 
         // Validate email addresses:
-        if ($this->maxRecipients > 0
-            && $this->maxRecipients < count($recipients)
-        ) {
-            throw new MailException('Too Many Email Recipients');
+        if ($this->maxRecipients > 0) {
+            if ($this->maxRecipients < count($recipients)) {
+                throw new MailException('Too Many Email Recipients');
+            }
         }
-        $validator = new \Zend\Validator\EmailAddress();
+        $validator = new \Laminas\Validator\EmailAddress();
         if (count($recipients) == 0) {
             throw new MailException('Invalid Recipient Email Address');
         }
@@ -159,20 +242,51 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
                 throw new MailException('Invalid Recipient Email Address');
             }
         }
-        if (!$validator->isValid($from)) {
+        foreach ($replyTo as $current) {
+            if (!$validator->isValid($current->getEmail())) {
+                throw new MailException('Invalid Reply-To Email Address');
+            }
+        }
+        $fromEmail = ($from instanceof Address)
+            ? $from->getEmail() : $from;
+        if (!$validator->isValid($fromEmail)) {
             throw new MailException('Invalid Sender Email Address');
+        }
+
+        if (!empty($this->fromAddressOverride)
+            && $this->fromAddressOverride != $fromEmail
+        ) {
+            // Add the original from address as the reply-to address unless
+            // a reply-to address has been specified
+            if (count($replyTo) === 0) {
+                $replyTo->add($fromEmail);
+            }
+            if (!($from instanceof Address)) {
+                $from = new Address($from);
+            }
+            $name = $from->getName();
+            if (!$name) {
+                list($fromPre) = explode('@', $from->getEmail());
+                $name = $fromPre ? $fromPre : null;
+            }
+            $from = new Address($this->fromAddressOverride, $name);
         }
 
         // Convert all exceptions thrown by mailer into MailException objects:
         try {
             // Send message
-            $message = $this->getNewMessage()
-                ->addFrom($from)
+            $message = $body instanceof MimeMessage
+                ? $this->getNewBlankMessage()
+                : $this->getNewMessage();
+            $message->addFrom($from)
                 ->addTo($recipients)
                 ->setBody($body)
                 ->setSubject($subject);
             if ($cc !== null) {
                 $message->addCc($cc);
+            }
+            if ($replyTo) {
+                $message->addReplyTo($replyTo);
             }
             $this->getTransport()->send($message);
         } catch (\Exception $e) {
@@ -183,21 +297,26 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     /**
      * Send an email message representing a link.
      *
-     * @param string                          $to      Recipient email address
-     * @param string                          $from    Sender email address
-     * @param string                          $msg     User notes to include in
+     * @param string                             $to      Recipient email address
+     * @param string|\Laminas\Mail\Address       $from    Sender name and email
+     * address
+     * @param string                             $msg     User notes to include in
      * message
-     * @param string                          $url     URL to share
-     * @param \Zend\View\Renderer\PhpRenderer $view    View object (used to render
+     * @param string                             $url     URL to share
+     * @param \Laminas\View\Renderer\PhpRenderer $view    View object (used to render
      * email templates)
-     * @param string                          $subject Subject for email (optional)
-     * @param string                          $cc      CC recipient (null for none)
+     * @param string                             $subject Subject for email
+     * (optional)
+     * @param string                             $cc      CC recipient (null for
+     * none)
+     * @param string|Address|AddressList         $replyTo Reply-To address (or
+     * delimited list, null for none)
      *
      * @throws MailException
      * @return void
      */
     public function sendLink($to, $from, $msg, $url, $view, $subject = null,
-        $cc = null
+        $cc = null, $replyTo = null
     ) {
         if (null === $subject) {
             $subject = $this->getDefaultLinkSubject();
@@ -208,7 +327,7 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
                 'msgUrl' => $url, 'to' => $to, 'from' => $from, 'message' => $msg
             ]
         );
-        return $this->send($to, $from, $subject, $body, $cc);
+        return $this->send($to, $from, $subject, $body, $cc, $replyTo);
     }
 
     /**
@@ -224,21 +343,26 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     /**
      * Send an email message representing a record.
      *
-     * @param string                            $to      Recipient email address
-     * @param string                            $from    Sender email address
-     * @param string                            $msg     User notes to include in
+     * @param string                             $to      Recipient email address
+     * @param string|\Laminas\Mail\Address       $from    Sender name and email
+     * address
+     * @param string                             $msg     User notes to include in
      * message
-     * @param \VuFind\RecordDriver\AbstractBase $record  Record being emailed
-     * @param \Zend\View\Renderer\PhpRenderer   $view    View object (used to render
+     * @param \VuFind\RecordDriver\AbstractBase  $record  Record being emailed
+     * @param \Laminas\View\Renderer\PhpRenderer $view    View object (used to render
      * email templates)
-     * @param string                            $subject Subject for email (optional)
-     * @param string                            $cc      CC recipient (null for none)
+     * @param string                             $subject Subject for email
+     * (optional)
+     * @param string                             $cc      CC recipient (null for
+     * none)
+     * @param string|Address|AddressList         $replyTo Reply-To address (or
+     * delimited list, null for none)
      *
      * @throws MailException
      * @return void
      */
     public function sendRecord($to, $from, $msg, $record, $view, $subject = null,
-        $cc = null
+        $cc = null, $replyTo = null
     ) {
         if (null === $subject) {
             $subject = $this->getDefaultRecordSubject($record);
@@ -249,13 +373,13 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
                 'driver' => $record, 'to' => $to, 'from' => $from, 'message' => $msg
             ]
         );
-        return $this->send($to, $from, $subject, $body, $cc);
+        return $this->send($to, $from, $subject, $body, $cc, $replyTo);
     }
 
     /**
      * Set the maximum number of email recipients
      *
-     * @param type $max Maximum
+     * @param int $max Maximum
      *
      * @return void
      */
@@ -275,5 +399,47 @@ class Mailer implements \VuFind\I18n\Translator\TranslatorAwareInterface
     {
         return $this->translate('Library Catalog Record') . ': '
             . $record->getBreadcrumb();
+    }
+
+    /**
+     * Get the "From" address override value
+     *
+     * @return string
+     */
+    public function getFromAddressOverride()
+    {
+        return $this->fromAddressOverride;
+    }
+
+    /**
+     * Set the "From" address override
+     *
+     * @param string $address "From" address
+     *
+     * @return void
+     */
+    public function setFromAddressOverride($address)
+    {
+        $this->fromAddressOverride = $address;
+    }
+
+    /**
+     * Convert the given addresses to an AddressList object
+     *
+     * @param string|Address|AddressList $addresses Addresses
+     *
+     * @return AddressList
+     */
+    protected function convertToAddressList($addresses)
+    {
+        if ($addresses instanceof AddressList) {
+            $result = $addresses;
+        } elseif ($addresses instanceof Address) {
+            $result = new AddressList();
+            $result->add($addresses);
+        } else {
+            $result = $this->stringToAddressList($addresses ? $addresses : '');
+        }
+        return $result;
     }
 }

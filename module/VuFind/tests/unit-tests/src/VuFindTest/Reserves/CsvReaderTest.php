@@ -2,7 +2,7 @@
 /**
  * Course Reserves CSV Loader Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Reserves;
+
 use VuFind\Reserves\CsvReader;
 
 /**
  * Course Reserves CSV Loader Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class CsvReaderTest extends \VuFindTest\Unit\TestCase
 {
@@ -135,12 +136,12 @@ class CsvReaderTest extends \VuFindTest\Unit\TestCase
      * Test loading an empty file.
      *
      * @return void
-     *
-     * @expectedException        \Exception
-     * @expectedExceptionMessage Could not find valid data. Details:
      */
     public function testEmptyFile()
     {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Could not find valid data. Details:');
+
         $this->getReader('empty.csv')->getReserves();
     }
 

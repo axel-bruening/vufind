@@ -2,7 +2,7 @@
 /**
  * LDAP authentication class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Franck Borel <franck.borel@gbv.de>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 namespace VuFind\Auth;
+
 use VuFind\Exception\Auth as AuthException;
 
 /**
  * LDAP authentication class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Authentication
  * @author   Franck Borel <franck.borel@gbv.de>
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:authentication_handlers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
 class LDAP extends AbstractBase
 {
@@ -85,7 +86,7 @@ class LDAP extends AbstractBase
     /**
      * Attempt to authenticate the current user.  Throws exception if login fails.
      *
-     * @param \Zend\Http\PhpEnvironment\Request $request Request object containing
+     * @param \Laminas\Http\PhpEnvironment\Request $request Request object containing
      * account credentials.
      *
      * @throws AuthException
@@ -158,9 +159,11 @@ class LDAP extends AbstractBase
         }
 
         // if the host parameter is not specified as ldaps://
-        // then we need to initiate TLS so we
+        // then (unless TLS is disabled) we need to initiate TLS so we
         // can have a secure connection over the standard LDAP port.
-        if (stripos($host, 'ldaps://') === false) {
+        $disableTls = isset($this->config->LDAP->disable_tls)
+            && $this->config->LDAP->disable_tls;
+        if (stripos($host, 'ldaps://') === false && !$disableTls) {
             $this->debug('Starting TLS');
             if (!@ldap_start_tls($connection)) {
                 $this->debug('TLS failed');
@@ -277,10 +280,21 @@ class LDAP extends AbstractBase
                 foreach ($fields as $field) {
                     $configValue = $this->getSetting($field);
                     if ($data[$i][$j] == $configValue && !empty($configValue)) {
-                        $value = $data[$i][$configValue][0];
-                        $this->debug("found $field = $value");
+                        $value = $data[$i][$configValue];
+                        $separator = $this->config->LDAP->separator;
+                        // if no separator is given map only the first value
+                        if (isset($separator)) {
+                            $tmp = [];
+                            for ($k = 0; $k < $value["count"]; $k++) {
+                                $tmp[] = $value[$k];
+                            }
+                            $value = implode($separator, $tmp);
+                        } else {
+                            $value = $value[0];
+                        }
+
                         if ($field != "cat_password") {
-                            $user->$field = $value;
+                            $user->$field = ($value === null) ? '' : $value;
                         } else {
                             $catPassword = $value;
                         }
@@ -289,9 +303,19 @@ class LDAP extends AbstractBase
             }
         }
 
-        // Save credentials if applicable:
-        if (!empty($catPassword) && !empty($user->cat_username)) {
-            $user->saveCredentials($user->cat_username, $catPassword);
+        // Save credentials if applicable. Note that we want to allow empty
+        // passwords (see https://github.com/vufind-org/vufind/pull/532), but
+        // we also want to be careful not to replace a non-blank password with a
+        // blank one in case the auth mechanism fails to provide a password on
+        // an occasion after the user has manually stored one. (For discussion,
+        // see https://github.com/vufind-org/vufind/pull/612). Note that in the
+        // (unlikely) scenario that a password can actually change from non-blank
+        // to blank, additional work may need to be done here.
+        if (!empty($user->cat_username)) {
+            $user->saveCredentials(
+                $user->cat_username,
+                empty($catPassword) ? $user->getCatPassword() : $catPassword
+            );
         }
 
         // Update the user in the database, then return it to the caller:

@@ -2,7 +2,7 @@
 /**
  * Export Support Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,30 +17,32 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest;
-use VuFind\Export, Zend\Config\Config;
+
+use Laminas\Config\Config;
+use VuFind\Export;
 
 /**
  * Export Support Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-class ExportTest extends \PHPUnit_Framework_TestCase
+class ExportTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * Test bulk options using legacy (deprecated) configuration.
+     * Test options using legacy (deprecated) configuration.
      *
      * @return void
      */
@@ -59,26 +61,7 @@ class ExportTest extends \PHPUnit_Framework_TestCase
             ],
         ];
         $export = $this->getExport($config);
-        $this->assertEquals(['foo', 'bar'], $export->getBulkOptions());
-    }
-
-    /**
-     * Test bulk options.
-     *
-     * @return void
-     */
-    public function testGetBulkOptions()
-    {
-        $config = [
-            'Export' => [
-                'foo' => 'record,bulk',
-                'bar' => 'record,bulk',
-                'baz' => 0,
-                'xyzzy' => 'record',
-            ],
-        ];
-        $export = $this->getExport($config);
-        $this->assertEquals(['foo', 'bar'], $export->getBulkOptions());
+        $this->assertEquals(['foo', 'bar'], $export->getActiveFormats('bulk'));
     }
 
     /**

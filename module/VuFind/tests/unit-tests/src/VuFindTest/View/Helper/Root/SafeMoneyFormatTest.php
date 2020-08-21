@@ -2,7 +2,7 @@
 /**
  * SafeMoneyFormat view helper Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\View\Helper\Root;
+
 use VuFind\View\Helper\Root\SafeMoneyFormat;
 
 /**
  * SafeMoneyFormat view helper Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-class SafeMoneyFormatTest extends \PHPUnit_Framework_TestCase
+class SafeMoneyFormatTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Locale (for restoration after testing)
@@ -51,7 +52,7 @@ class SafeMoneyFormatTest extends \PHPUnit_Framework_TestCase
      *
      * @return void
      */
-    public function setUp()
+    public function setUp(): void
     {
         // store current default and set a value for consistency in testing
         $this->locale = setlocale(LC_MONETARY, 0);
@@ -66,7 +67,7 @@ class SafeMoneyFormatTest extends \PHPUnit_Framework_TestCase
      *
      * @return void
      */
-    public function tearDown()
+    public function tearDown(): void
     {
         // restore current default
         setlocale(LC_MONETARY, $this->locale);
@@ -79,8 +80,8 @@ class SafeMoneyFormatTest extends \PHPUnit_Framework_TestCase
      */
     public function testFormatting()
     {
-        $escaper = new \Zend\View\Helper\EscapeHtml();
-        $view = $this->getMock('Zend\View\Renderer\PhpRenderer');
+        $escaper = new \Laminas\View\Helper\EscapeHtml();
+        $view = $this->createMock(\Laminas\View\Renderer\PhpRenderer::class);
         $view->expects($this->any())->method('plugin')
             ->with($this->equalTo('escapeHtml'))
             ->will($this->returnValue($escaper));

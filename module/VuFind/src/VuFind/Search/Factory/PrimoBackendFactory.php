@@ -3,7 +3,7 @@
 /**
  * Factory for Primo Central backends.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,80 +18,87 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Factory;
 
-use VuFindSearch\Backend\Primo\Connector;
-use VuFindSearch\Backend\BackendInterface;
-use VuFindSearch\Backend\Primo\Response\RecordCollectionFactory;
-use VuFindSearch\Backend\Primo\QueryBuilder;
-use VuFindSearch\Backend\Primo\Backend;
+use Interop\Container\ContainerInterface;
 
+use Laminas\ServiceManager\Factory\FactoryInterface;
+use LmcRbacMvc\Service\AuthorizationService;
 use VuFind\Search\Primo\InjectOnCampusListener;
 use VuFind\Search\Primo\PrimoPermissionHandler;
 
-use Zend\ServiceManager\ServiceLocatorInterface;
-use Zend\ServiceManager\FactoryInterface;
+use VuFindSearch\Backend\Primo\Backend;
+use VuFindSearch\Backend\Primo\Connector;
+
+use VuFindSearch\Backend\Primo\QueryBuilder;
+
+use VuFindSearch\Backend\Primo\Response\RecordCollectionFactory;
 
 /**
  * Factory for Primo Central backends.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class PrimoBackendFactory implements FactoryInterface
 {
     /**
      * Logger.
      *
-     * @var Zend\Log\LoggerInterface
+     * @var \Laminas\Log\LoggerInterface
      */
     protected $logger;
 
     /**
      * Superior service manager.
      *
-     * @var ServiceLocatorInterface
+     * @var ContainerInterface
      */
     protected $serviceLocator;
 
     /**
      * Primo configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $primoConfig;
 
     /**
-     * Create the backend.
+     * Create service
      *
-     * @param ServiceLocatorInterface $serviceLocator Superior service manager
+     * @param ContainerInterface $sm      Service manager
+     * @param string             $name    Requested service name (unused)
+     * @param array              $options Extra options (unused)
      *
-     * @return BackendInterface
+     * @return Backend
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function createService(ServiceLocatorInterface $serviceLocator)
+    public function __invoke(ContainerInterface $sm, $name, array $options = null)
     {
-        $this->serviceLocator = $serviceLocator;
-        $configReader = $this->serviceLocator->get('VuFind\Config');
+        $this->serviceLocator = $sm;
+        $configReader = $this->serviceLocator
+            ->get(\VuFind\Config\PluginManager::class);
         $this->primoConfig = $configReader->get('Primo');
-        if ($this->serviceLocator->has('VuFind\Logger')) {
-            $this->logger = $this->serviceLocator->get('VuFind\Logger');
+        if ($this->serviceLocator->has(\VuFind\Log\Logger::class)) {
+            $this->logger = $this->serviceLocator->get(\VuFind\Log\Logger::class);
         }
 
         $connector = $this->createConnector();
         $backend   = $this->createBackend($connector);
 
-        $this->createListeners($backend);
+        $this->createListeners();
 
         return $backend;
     }
@@ -114,11 +121,9 @@ class PrimoBackendFactory implements FactoryInterface
     /**
      * Create listeners.
      *
-     * @param Backend $backend Backend
-     *
      * @return void
      */
-    protected function createListeners(Backend $backend)
+    protected function createListeners()
     {
         $events = $this->serviceLocator->get('SharedEventManager');
 
@@ -135,22 +140,24 @@ class PrimoBackendFactory implements FactoryInterface
         // Get the PermissionHandler
         $permHandler = $this->getPermissionHandler();
 
-        // Load credentials and port number:
-        $id = isset($this->primoConfig->General->apiId)
-            ? $this->primoConfig->General->apiId : null;
-        $port = isset($this->primoConfig->General->port)
-            ? $this->primoConfig->General->port : 1701;
+        // Load url and credentials:
+        if (!isset($this->primoConfig->General->url)) {
+            throw new \Exception('Missing url in Primo.ini');
+        }
         $instCode = isset($permHandler)
             ? $permHandler->getInstCode()
             : null;
 
         // Build HTTP client:
-        $client = $this->serviceLocator->get('VuFind\Http')->createClient();
+        $client = $this->serviceLocator->get(\VuFindHttp\HttpService::class)
+            ->createClient();
         $timeout = isset($this->primoConfig->General->timeout)
             ? $this->primoConfig->General->timeout : 30;
         $client->setOptions(['timeout' => $timeout]);
 
-        $connector = new Connector($id, $instCode, $client, $port);
+        $connector = new Connector(
+            $this->primoConfig->General->url, $instCode, $client
+        );
         $connector->setLogger($this->logger);
         return $connector;
     }
@@ -173,7 +180,8 @@ class PrimoBackendFactory implements FactoryInterface
      */
     protected function createRecordCollectionFactory()
     {
-        $manager = $this->serviceLocator->get('VuFind\RecordDriverPluginManager');
+        $manager = $this->serviceLocator
+            ->get(\VuFind\RecordDriver\PluginManager::class);
         $callback = function ($data) use ($manager) {
             $driver = $manager->get('Primo');
             $driver->setRawData($data);
@@ -205,7 +213,7 @@ class PrimoBackendFactory implements FactoryInterface
                 $this->primoConfig->Institutions
             );
             $permHandler->setAuthorizationService(
-                $this->serviceLocator->get('ZfcRbac\Service\AuthorizationService')
+                $this->serviceLocator->get(AuthorizationService::class)
             );
             return $permHandler;
         }

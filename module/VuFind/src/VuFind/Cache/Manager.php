@@ -2,9 +2,10 @@
 /**
  * VuFind Cache Manager
  *
- * PHP version 5
+ * PHP version 7
  *
- * Copyright (C) Villanova University 2007.
+ * Copyright (C) Villanova University 2007,
+ *               2018 Leipzig University Library <info@ub.uni-leipzig.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -17,27 +18,32 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Cache
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Sebastian Kehr <kehr@ub.uni-leipzig.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Cache;
-use Zend\Cache\StorageFactory, Zend\Config\Config;
+
+use Laminas\Cache\Storage\StorageInterface;
+use Laminas\Cache\StorageFactory;
+use Laminas\Config\Config;
 
 /**
  * VuFind Cache Manager
  *
  * Creates file and APC caches
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Cache
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Sebastian Kehr <kehr@ub.uni-leipzig.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Manager
 {
@@ -65,7 +71,7 @@ class Manager
     /**
      * Actual cache objects generated from settings.
      *
-     * @var array
+     * @var StorageInterface[]
      */
     protected $caches = [];
 
@@ -77,10 +83,10 @@ class Manager
      */
     public function __construct(Config $config, Config $searchConfig)
     {
-        // $config and $config->Cache are Zend\Config\Config objects
+        // $config and $config->Cache are Laminas\Config\Config objects
         // $cache is created immutable, so get the array, it will be modified
         // downstream.
-        // Zend\Config\Config can be created mutable or cloned and merged, useful
+        // Laminas\Config\Config can be created mutable or cloned and merged, useful
         // for future cache-specific overrides.
         $cacheConfig = isset($config->Cache) ? $config->Cache : false;
         $this->defaults = $cacheConfig ? $cacheConfig->toArray() : false;
@@ -89,9 +95,10 @@ class Manager
         $cacheBase = $this->getCacheDir();
 
         // Set up standard file-based caches:
-        foreach (['config', 'cover', 'language', 'object'] as $cache) {
+        foreach (['config', 'cover', 'language', 'object', 'yaml'] as $cache) {
             $this->createFileCache($cache, $cacheBase . $cache . 's');
         }
+        $this->createFileCache('public', $cacheBase . 'public');
 
         // Set up search specs cache based on config settings:
         $searchCacheType = isset($searchConfig->Cache->type)
@@ -114,26 +121,33 @@ class Manager
     /**
      * Retrieve the specified cache object.
      *
-     * @param string $key Key identifying the requested cache.
+     * @param string      $name      Name of the requested cache.
+     * @param string|null $namespace Optional namespace to use. Defaults to the
+     * value of $name.
      *
-     * @return object
+     * @return StorageInterface
+     * @throws \Exception
      */
-    public function getCache($key)
+    public function getCache($name, $namespace = null)
     {
+        $namespace = $namespace ?? $name;
+        $key = "$name:$namespace";
+
         if (!isset($this->caches[$key])) {
-            if (!isset($this->cacheSettings[$key])) {
-                throw new \Exception('Requested unknown cache: ' . $key);
+            if (!isset($this->cacheSettings[$name])) {
+                throw new \Exception('Requested unknown cache: ' . $name);
             }
             // Special case for "no-cache" caches:
-            if ($this->cacheSettings[$key] === false) {
+            if ($this->cacheSettings[$name] === false) {
                 $this->caches[$key]
                     = new \VuFind\Cache\Storage\Adapter\NoCacheAdapter();
             } else {
-                $this->caches[$key] = StorageFactory::factory(
-                    $this->cacheSettings[$key]
-                );
+                $settings = $this->cacheSettings[$name];
+                $settings['adapter']['options']['namespace'] = $namespace;
+                $this->caches[$key] = StorageFactory::factory($settings);
             }
         }
+
         return $this->caches[$key];
     }
 
@@ -158,7 +172,7 @@ class Manager
 
         if (strlen(LOCAL_CACHE_DIR) > 0) {
             $dir = LOCAL_CACHE_DIR . '/';
-        } else if (strlen(LOCAL_OVERRIDE_DIR) > 0) {
+        } elseif (strlen(LOCAL_OVERRIDE_DIR) > 0) {
             $dir = LOCAL_OVERRIDE_DIR . '/cache/';
         } else {
             $dir = APPLICATION_PATH . '/data/cache/';
@@ -193,7 +207,7 @@ class Manager
     }
 
     /**
-     * Create a new file cache for the given theme name if neccessary. Return
+     * Create a new file cache for the given theme name if necessary. Return
      * the name of the cache.
      *
      * @param string $themeName Name of the theme

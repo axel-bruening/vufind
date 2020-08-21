@@ -2,7 +2,7 @@
 /**
  * Favorites aspect of the Search Multi-class (Results)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,28 +17,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Favorites
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Favorites;
-use VuFind\Exception\ListPermission as ListPermissionException,
-    VuFind\Search\Base\Results as BaseResults,
-    ZfcRbac\Service\AuthorizationServiceAwareInterface,
-    ZfcRbac\Service\AuthorizationServiceAwareTrait;
+
+use LmcRbacMvc\Service\AuthorizationServiceAwareInterface;
+use LmcRbacMvc\Service\AuthorizationServiceAwareTrait;
+use VuFind\Db\Table\Resource as ResourceTable;
+use VuFind\Db\Table\UserList as ListTable;
+use VuFind\Exception\ListPermission as ListPermissionException;
+use VuFind\Record\Cache;
+use VuFind\Record\Loader;
+use VuFind\Search\Base\Results as BaseResults;
+use VuFindSearch\Service as SearchService;
 
 /**
  * Search Favorites Results
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_Favorites
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class Results extends BaseResults
     implements AuthorizationServiceAwareInterface
@@ -60,6 +66,39 @@ class Results extends BaseResults
     protected $list = false;
 
     /**
+     * Resource table
+     *
+     * @var ResourceTable
+     */
+    protected $resourceTable;
+
+    /**
+     * UserList table
+     *
+     * @var ListTable
+     */
+    protected $listTable;
+
+    /**
+     * Constructor
+     *
+     * @param \VuFind\Search\Base\Params $params        Object representing user
+     * search parameters.
+     * @param SearchService              $searchService Search service
+     * @param Loader                     $recordLoader  Record loader
+     * @param ResourceTable              $resourceTable Resource table
+     * @param ListTable                  $listTable     UserList table
+     */
+    public function __construct(\VuFind\Search\Base\Params $params,
+        SearchService $searchService, Loader $recordLoader,
+        ResourceTable $resourceTable, ListTable $listTable
+    ) {
+        parent::__construct($params, $searchService, $recordLoader);
+        $this->resourceTable = $resourceTable;
+        $this->listTable = $listTable;
+    }
+
+    /**
      * Returns the stored list of facets for the last search
      *
      * @param array $filter Array of field => on-screen description listing
@@ -70,12 +109,12 @@ class Results extends BaseResults
     public function getFacetList($filter = null)
     {
         // Make sure we have processed the search before proceeding:
-        if (is_null($this->user)) {
+        if (null === $this->user) {
             $this->performAndProcessSearch();
         }
 
         // If there is no filter, we'll use all facets as the filter:
-        if (is_null($filter)) {
+        if (null === $filter) {
             $filter = $this->getParams()->getFacetConfig();
         }
 
@@ -131,12 +170,12 @@ class Results extends BaseResults
         // Make sure the user and/or list objects make it possible to view
         // the current result set -- we need to check logged in status and
         // list permissions.
-        if (is_null($list) && !$this->user) {
+        if (null === $list && !$this->user) {
             throw new ListPermissionException(
                 'Cannot retrieve favorites without logged in user.'
             );
         }
-        if (!is_null($list) && !$list->public
+        if (null !== $list && !$list->public
             && (!$this->user || $list->user_id != $this->user->id)
         ) {
             throw new ListPermissionException(
@@ -145,10 +184,9 @@ class Results extends BaseResults
         }
 
         // How many results were there?
-        $resource = $this->getTable('Resource');
-        $userId = is_null($list) ? $this->user->id : $list->user_id;
-        $listId = is_null($list) ? null : $list->id;
-        $rawResults = $resource->getFavorites(
+        $userId = null === $list ? $this->user->id : $list->user_id;
+        $listId = null === $list ? null : $list->id;
+        $rawResults = $this->resourceTable->getFavorites(
             $userId, $listId, $this->getTagFilters(), $this->getParams()->getSort()
         );
         $this->resultTotal = count($rawResults);
@@ -156,7 +194,7 @@ class Results extends BaseResults
         // Apply offset and limit if necessary!
         $limit = $this->getParams()->getLimit();
         if ($this->resultTotal > $limit) {
-            $rawResults = $resource->getFavorites(
+            $rawResults = $this->resourceTable->getFavorites(
                 $userId, $listId, $this->getTagFilters(),
                 $this->getParams()->getSort(), $this->getStartRecord() - 1, $limit
             );
@@ -172,8 +210,9 @@ class Results extends BaseResults
                 ]
             ];
         }
-        $this->results = $this->getServiceLocator()->get('VuFind\RecordLoader')
-            ->loadBatch($recordsToRequest);
+
+        $this->recordLoader->setCacheContext(Cache::CONTEXT_FAVORITE);
+        $this->results = $this->recordLoader->loadBatch($recordsToRequest, true);
     }
 
     /**
@@ -183,8 +222,8 @@ class Results extends BaseResults
      */
     protected function getTagFilters()
     {
-        $filters = $this->getParams()->getFilters();
-        return isset($filters['tags']) ? $filters['tags'] : [];
+        $filters = $this->getParams()->getRawFilters();
+        return $filters['tags'] ?? [];
     }
 
     /**
@@ -199,14 +238,10 @@ class Results extends BaseResults
         if ($this->list === false) {
             // Check the filters for a list ID, and load the corresponding object
             // if one is found:
-            $filters = $this->getParams()->getFilters();
-            $listId = isset($filters['lists'][0]) ? $filters['lists'][0] : null;
-            if (null === $listId) {
-                $this->list = null;
-            } else {
-                $table = $this->getTable('UserList');
-                $this->list = $table->getExisting($listId);
-            }
+            $filters = $this->getParams()->getRawFilters();
+            $listId = $filters['lists'][0] ?? null;
+            $this->list = (null === $listId)
+                ? null : $this->listTable->getExisting($listId);
         }
         return $this->list;
     }

@@ -2,7 +2,7 @@
 /**
  * SyndeticsPlus view helper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,38 +17,38 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\View\Helper\Root;
 
 /**
  * SyndeticsPlus view helper
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class SyndeticsPlus extends \Zend\View\Helper\AbstractHelper
+class SyndeticsPlus extends \Laminas\View\Helper\AbstractHelper
 {
     /**
      * Syndetics configuration
      *
-     * \Zend\Config\Config
+     * \Laminas\Config\Config
      */
     protected $config;
 
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config Syndetics configuration (should contain
+     * @param \Laminas\Config\Config $config Syndetics configuration (should contain
      * 'plus' boolean value (true if Syndetics Plus is enabled) and 'plus_id' string
      * value (Syndetics Plus user ID).  If these values are absent, SyndeticsPlus
      * will be disabled.

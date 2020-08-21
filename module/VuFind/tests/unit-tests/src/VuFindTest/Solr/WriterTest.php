@@ -2,7 +2,7 @@
 /**
  * Solr Writer Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Solr;
-use VuFind\Db\Table\ChangeTracker, VuFind\Search\BackendManager;
+
+use VuFind\Db\Table\ChangeTracker;
+use VuFind\Search\BackendManager;
 use VuFind\Solr\Writer;
 
 /**
  * Solr Utils Test Class
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 class WriterTest extends \VuFindTest\Unit\TestCase
 {
@@ -49,9 +51,9 @@ class WriterTest extends \VuFindTest\Unit\TestCase
     {
         $bm = $this->getBackendManagerWithMockSolr();
         $connector = $bm->get('Solr')->getConnector();
-        $connector->expects($this->at(0))->method('setTimeout')->with($this->equalTo(60 * 60));
+        $connector->expects($this->at(1))->method('setTimeout')->with($this->equalTo(60 * 60));
         $connector->expects($this->once())->method('write')->with($this->isInstanceOf('VuFindSearch\Backend\Solr\Document\CommitDocument'));
-        $connector->expects($this->at(2))->method('setTimeout')->with($this->equalTo(30));
+        $connector->expects($this->at(3))->method('setTimeout')->with($this->equalTo(30));
         $writer = new Writer($bm, $this->getMockChangeTracker());
         $writer->commit('Solr');
     }
@@ -80,9 +82,9 @@ class WriterTest extends \VuFindTest\Unit\TestCase
     {
         $bm = $this->getBackendManagerWithMockSolr();
         $connector = $bm->get('Solr')->getConnector();
-        $connector->expects($this->at(0))->method('setTimeout')->with($this->equalTo(60 * 60 * 24));
+        $connector->expects($this->at(1))->method('setTimeout')->with($this->equalTo(60 * 60 * 24));
         $connector->expects($this->once())->method('write')->with($this->isInstanceOf('VuFindSearch\Backend\Solr\Document\OptimizeDocument'));
-        $connector->expects($this->at(2))->method('setTimeout')->with($this->equalTo(30));
+        $connector->expects($this->at(3))->method('setTimeout')->with($this->equalTo(30));
         $writer = new Writer($bm, $this->getMockChangeTracker());
         $writer->optimize('Solr');
     }
@@ -131,18 +133,18 @@ class WriterTest extends \VuFindTest\Unit\TestCase
      */
     protected function getBackendManagerWithMockSolr()
     {
-        $sm = new \Zend\ServiceManager\ServiceManager();
+        $sm = new \Laminas\ServiceManager\ServiceManager();
         $pm = new BackendManager($sm);
-        $mockBackend = $this->getMockBuilder('VuFindSearch\Backend\Solr\Backend')
+        $mockBackend = $this->getMockBuilder(\VuFindSearch\Backend\Solr\Backend::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $mockConnector = $this->getMockBuilder('VuFindSearch\Backend\Solr\Connector')
+        $mockConnector = $this->getMockBuilder(\VuFindSearch\Backend\Solr\Connector::class)
             ->disableOriginalConstructor()
-            ->setMethods(['getUrl', 'setTimeout', 'write'])
+            ->setMethods(['getUrl', 'getTimeout', 'setTimeout', 'write'])
             ->getMock();
         $mockBackend->expects($this->any())->method('getConnector')->will($this->returnValue($mockConnector));
         $mockConnector->expects($this->any())->method('getTimeout')->will($this->returnValue(30));
-        $mockConnector->expects($this->any())->method('getUrl')->will($this->returnValue('http://localhost:8080/solr/biblio'));
+        $mockConnector->expects($this->any())->method('getUrl')->will($this->returnValue('http://localhost:8983/solr/biblio'));
         $sm->setService('Solr', $mockBackend);
         return $pm;
     }
@@ -154,7 +156,7 @@ class WriterTest extends \VuFindTest\Unit\TestCase
      */
     protected function getMockChangeTracker()
     {
-        return $this->getMockBuilder('VuFind\Db\Table\ChangeTracker')
+        return $this->getMockBuilder(\VuFind\Db\Table\ChangeTracker::class)
             ->disableOriginalConstructor()
             ->setMethods(['markDeleted'])
             ->getMock();

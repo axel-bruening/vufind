@@ -2,7 +2,7 @@
 /**
  * Proxy URL view helper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,38 +17,38 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Root;
 
 /**
  * Proxy URL view helper
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
-class ProxyUrl extends \Zend\View\Helper\AbstractHelper
+class ProxyUrl extends \Laminas\View\Helper\AbstractHelper
 {
     /**
      * VuFind configuration
      *
-     * @var \Zend\Config\Config
+     * @var \Laminas\Config\Config
      */
     protected $config;
 
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config VuFind configuration
+     * @param \Laminas\Config\Config $config VuFind configuration
      */
     public function __construct($config = null)
     {
@@ -64,9 +64,10 @@ class ProxyUrl extends \Zend\View\Helper\AbstractHelper
      */
     public function __invoke($url)
     {
-        if (isset($this->config->EZproxy->host)) {
-            $url = $this->config->EZproxy->host . '/login?qurl=' . urlencode($url);
-        }
-        return $url;
+        $usePrefix = !isset($this->config->EZproxy->prefixLinks)
+            || $this->config->EZproxy->prefixLinks;
+        return ($usePrefix && isset($this->config->EZproxy->host))
+            ? $this->config->EZproxy->host . '/login?qurl=' . urlencode($url)
+            : $url;
     }
 }

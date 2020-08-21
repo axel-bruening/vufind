@@ -2,7 +2,7 @@
 /**
  * Hierarchy Tree Data Formatter (abstract base)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2015.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_DataFormatter
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 namespace VuFind\Hierarchy\TreeDataFormatter;
 
 /**
  * Hierarchy Tree Data Formatter (abstract base)
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_DataFormatter
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 abstract class AbstractBase
 {
@@ -129,7 +129,7 @@ abstract class AbstractBase
         return $retVal;
     }
 
-     /**
+    /**
      * Get the titles of this item within parent collections. Returns an array
      * of parent ID => sequence number.
      *
@@ -169,7 +169,7 @@ abstract class AbstractBase
         // Check config setting for what constitutes a collection
         switch ($this->collectionType) {
         case 'All':
-            return (isset($fields->is_hierarchy_id));
+            return isset($fields->is_hierarchy_id);
         case 'Top':
             return isset($fields->is_hierarchy_id)
                 && in_array($fields->is_hierarchy_id, $fields->hierarchy_top_id);

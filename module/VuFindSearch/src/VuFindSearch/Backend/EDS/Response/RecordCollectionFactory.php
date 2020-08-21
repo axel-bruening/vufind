@@ -2,7 +2,7 @@
 /**
  * Factory for record collection.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) EBSCO Industries 2013
  *
@@ -17,27 +17,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\EDS\Response;
 
-use VuFindSearch\Response\RecordCollectionFactoryInterface;
 use VuFindSearch\Exception\InvalidArgumentException;
+use VuFindSearch\Response\RecordCollectionFactoryInterface;
 
 /**
  * Factory for record collection.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class RecordCollectionFactory implements RecordCollectionFactoryInterface
 {
@@ -92,22 +92,14 @@ class RecordCollectionFactory implements RecordCollectionFactoryInterface
             );
         }
         $collection = new $this->collectionClass($response);
-        //obtain path to records
-        $records = [];
-        if (isset($response['SearchResult'])
-            && isset($response['SearchResult']['Data'])
-            && isset($response['SearchResult']['Data']['Records'])
-        ) {
-            // Format of the search response
-            $records = $response['SearchResult']['Data']['Records'];
-        } else if (isset($response['Records'])) { // Format of the retrieve response
-            $records = $response['Records'];
-        }
+        // Obtain path to records -- first try format of the search response,
+        // then try format of the retrieve response, then give up with empty array.
+        $records = $response['SearchResult']['Data']['Records']
+            ?? $response['Records'] ?? [];
 
         foreach ($records as $record) {
-            $collection->add(call_user_func($this->recordFactory, $record));
+            $collection->add(call_user_func($this->recordFactory, $record), false);
         }
         return $collection;
     }
-
 }

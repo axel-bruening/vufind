@@ -2,7 +2,7 @@
 /**
  * Collection list tab
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,26 +17,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 namespace VuFind\RecordTab;
-use VuFind\Recommend\PluginManager as RecommendManager,
-    VuFind\Search\RecommendListener, VuFind\Search\SearchRunner;
+
+use VuFind\Recommend\PluginManager as RecommendManager;
+use VuFind\Search\RecommendListener;
+use VuFind\Search\SearchRunner;
 
 /**
  * Collection list tab
  *
- * @category VuFind2
+ * @category VuFind
  * @package  RecordTabs
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_tabs Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
 class CollectionList extends AbstractBase
 {
@@ -60,6 +62,13 @@ class CollectionList extends AbstractBase
      * @var RecommendManager
      */
     protected $recommendManager;
+
+    /**
+     * Search class id
+     *
+     * @var string
+     */
+    protected $searchClassId = 'SolrCollection';
 
     /**
      * Constructor
@@ -114,19 +123,9 @@ class CollectionList extends AbstractBase
                 $listener->attach($runner->getEventManager()->getSharedManager());
             };
             $this->results
-                = $this->runner->run($request, 'SolrCollection', $cb);
+                = $this->runner->run($request, $this->searchClassId, $cb);
         }
         return $this->results;
-    }
-
-    /**
-     * Get side recommendations.
-     *
-     * @return array
-     */
-    public function getSideRecommendations()
-    {
-        return $this->getResults()->getRecommendations('side');
     }
 
     /**
@@ -136,7 +135,7 @@ class CollectionList extends AbstractBase
      */
     public function supportsAjax()
     {
-        // No, special sidebar needed.
+        // No, search parameters from the URL are needed.
         return false;
     }
 }

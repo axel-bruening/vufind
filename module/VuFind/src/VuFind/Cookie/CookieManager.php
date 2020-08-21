@@ -2,9 +2,10 @@
 /**
  * Cookie Manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2015.
+ * Copyright (C) The National Library of Finland 2020.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -17,24 +18,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Cookie
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Cookie;
 
 /**
  * Cookie Manager
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Cookie
  * @author   Demian Katz <demian.katz@villanova.edu>
+ * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class CookieManager
 {
@@ -60,20 +63,48 @@ class CookieManager
     protected $secure;
 
     /**
+     * Are cookies HTTP only?
+     *
+     * @var bool
+     */
+    protected $httpOnly;
+
+    /**
+     * The name of the session cookie
+     *
+     * @var string
+     */
+    protected $sessionName;
+
+    /**
+     * Default SameSite attribute
+     *
+     * @var string
+     */
+    protected $sameSite;
+
+    /**
      * Constructor
      *
-     * @param array  $cookies Cookie array to manipulate (e.g. $_COOKIE)
-     * @param string $path    Cookie base path (default = /)
-     * @param string $domain  Cookie domain
-     * @param bool   $secure  Are cookies secure only? (default = false)
+     * @param array  $cookies     Cookie array to manipulate (e.g. $_COOKIE)
+     * @param string $path        Cookie base path (default = /)
+     * @param string $domain      Cookie domain
+     * @param bool   $secure      Are cookies secure only? (default = false)
+     * @param string $sessionName Session cookie name (if null defaults to PHP
+     * settings)
+     * @param bool   $httpOnly    Are cookies HTTP only? (default = true)
+     * @param string $sameSite    Default SameSite attribute (defaut = 'Lax')
      */
     public function __construct($cookies, $path = '/', $domain = null,
-        $secure = false
+        $secure = false, $sessionName = null, $httpOnly = true, $sameSite = 'Lax'
     ) {
         $this->cookies = $cookies;
         $this->path = $path;
         $this->domain = $domain;
         $this->secure = $secure;
+        $this->httpOnly = $httpOnly;
+        $this->sessionName = $sessionName;
+        $this->sameSite = $sameSite;
     }
 
     /**
@@ -117,33 +148,102 @@ class CookieManager
     }
 
     /**
-     * Support method for setGlobalCookie -- proxy PHP's setcookie() function
-     * for compatibility with unit testing.
+     * Are cookies set to "HTTP only" mode?
      *
      * @return bool
      */
-    public function proxySetCookie()
+    public function isHttpOnly()
     {
-        // Special case: in test suite -- don't actually write headers!
-        return defined('VUFIND_PHPUNIT_RUNNING')
-            ? true : call_user_func_array('setcookie', func_get_args());
+        return $this->httpOnly;
+    }
+
+    /**
+     * Get the name of the cookie
+     *
+     * @return mixed
+     */
+    public function getSessionName()
+    {
+        return $this->sessionName;
+    }
+
+    /**
+     * Get the cookie SameSite attribute.
+     *
+     * @return string
+     */
+    public function getSameSite()
+    {
+        return $this->sameSite;
+    }
+
+    /**
+     * Support method for setGlobalCookie -- proxy PHP's setcookie() function
+     * for compatibility with unit testing.
+     *
+     * @param string $key      Name of cookie to set
+     * @param mixed  $value    Value to set
+     * @param int    $expire   Cookie expiration time
+     * @param string $path     Path
+     * @param string $domain   Domain
+     * @param bool   $secure   Whether the cookie is secure only
+     * @param bool   $httpOnly Whether the cookie should be "HTTP only"
+     * @param string $sameSite SameSite attribute to use (Lax, Strict or None)
+     *
+     * @return bool
+     */
+    public function proxySetCookie($key, $value, $expire, $path, $domain, $secure,
+        $httpOnly, $sameSite
+    ) {
+        // Special case: in CLI -- don't actually write headers!
+        if ('cli' === PHP_SAPI) {
+            return true;
+        }
+        if (PHP_VERSION_ID < 70300) {
+            return setcookie(
+                $key, $value, $expire, "$path; samesite=$sameSite", $domain, $secure,
+                $httpOnly
+            );
+        }
+        return setcookie(
+            $key,
+            $value,
+            [
+                'expires' => $expire,
+                'path' => $path,
+                'domain' => $domain,
+                'samesite' => $sameSite,
+                'secure' => $secure,
+                'httponly' => $httpOnly,
+            ]
+        );
     }
 
     /**
      * Support method for set() -- set the actual cookie in PHP.
      *
-     * @param string $key    Name of cookie to set
-     * @param mixed  $value  Value to set
-     * @param int    $expire Cookie expiration time
+     * @param string    $key      Name of cookie to set
+     * @param mixed     $value    Value to set
+     * @param int       $expire   Cookie expiration time
+     * @param null|bool $httpOnly Whether the cookie should be "HTTP only"
+     * @param string    $sameSite SameSite attribute to use (Lax, Strict or None)
      *
      * @return bool
      */
-    public function setGlobalCookie($key, $value, $expire)
-    {
+    public function setGlobalCookie($key, $value, $expire, $httpOnly = null,
+        $sameSite = null
+    ) {
+        if (null === $httpOnly) {
+            $httpOnly = $this->httpOnly;
+        }
+        if (null === $sameSite) {
+            $sameSite = $this->sameSite;
+        }
         // Simple case: flat value.
         if (!is_array($value)) {
             return $this->proxySetCookie(
-                $key, $value, $expire, $this->path, $this->domain, $this->secure
+                $key, $value, $expire, $this->path, $this->domain, $this->secure,
+                $httpOnly, $sameSite
             );
         }
 
@@ -152,7 +252,7 @@ class CookieManager
         foreach ($value as $i => $curr) {
             $lastSuccess = $this->proxySetCookie(
                 $key . '[' . $i . ']', $curr, $expire,
-                $this->path, $this->domain, $this->secure
+                $this->path, $this->domain, $this->secure, $httpOnly, $sameSite
             );
             if (!$lastSuccess) {
                 $success = false;
@@ -164,15 +264,20 @@ class CookieManager
     /**
      * Set a cookie.
      *
-     * @param string $key    Name of cookie to set
-     * @param mixed  $value  Value to set
-     * @param int    $expire Cookie expiration time
+     * @param string    $key      Name of cookie to set
+     * @param mixed     $value    Value to set
+     * @param int       $expire   Cookie expiration time
+     * @param null|bool $httpOnly Whether the cookie should be "HTTP only"
+     * @param string    $sameSite SameSite attribute to use (Lax, Strict or None)
      *
      * @return bool
      */
-    public function set($key, $value, $expire = 0)
-    {
-        if ($success = $this->setGlobalCookie($key, $value, $expire)) {
+    public function set($key, $value, $expire = 0, $httpOnly = null,
+        $sameSite = null
+    ) {
+        $success = $this
+            ->setGlobalCookie($key, $value, $expire, $httpOnly, $sameSite);
+        if ($success) {
             $this->cookies[$key] = $value;
         }
         return $success;

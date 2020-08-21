@@ -2,7 +2,7 @@
 /**
  * Primo Permission Handler.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -17,27 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Primo;
 
-use ZfcRbac\Service\AuthorizationServiceAwareInterface,
-    ZfcRbac\Service\AuthorizationServiceAwareTrait;
+use LmcRbacMvc\Service\AuthorizationServiceAwareTrait;
 
 /**
  * Primo Permission Handler.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class PrimoPermissionHandler
 {
@@ -60,14 +59,14 @@ class PrimoPermissionHandler
     /**
      * Constructor.
      *
-     * @param Zend\Config\Config|array $primoPermConfig Primo-Config for
+     * @param Laminas\Config\Config|array $primoPermConfig Primo-Config for
      * Institutions
      *
      * @return void
      */
     public function __construct($primoPermConfig)
     {
-        if ($primoPermConfig instanceof \Zend\Config\Config) {
+        if ($primoPermConfig instanceof \Laminas\Config\Config) {
             $primoPermConfig = $primoPermConfig->toArray();
         }
         $this->primoConfig = is_array($primoPermConfig) ? $primoPermConfig : [];
@@ -94,11 +93,11 @@ class PrimoPermissionHandler
      *
      * @param string $code Code to approve against config file
      *
-     * @return boolean
+     * @return bool
      */
     public function instCodeExists($code)
     {
-        return (in_array($code, $this->getInstCodes()) === true);
+        return in_array($code, $this->getInstCodes()) === true;
     }
 
     /**
@@ -118,12 +117,12 @@ class PrimoPermissionHandler
     /**
      * Check if the user has permission
      *
-     * @return boolean
+     * @return bool
      */
     public function hasPermission()
     {
         $code = $this->getInstCode();
-        return (false !== $code && $this->checkPermission($code) === true);
+        return false !== $code && $this->checkPermission($code) === true;
     }
 
     /**
@@ -242,7 +241,6 @@ class PrimoPermissionHandler
         if ($this->instCode === null) {
             $this->instCode = false;
         }
-
     }
 
     /**
@@ -309,6 +307,6 @@ class PrimoPermissionHandler
         $authService = $this->getAuthorizationService();
 
         // if no authorization service is available, the user can't get permission
-        return ($authService && $authService->isGranted($onCampusRule));
+        return $authService && $authService->isGranted($onCampusRule);
     }
 }

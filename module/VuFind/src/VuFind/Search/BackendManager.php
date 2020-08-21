@@ -3,7 +3,7 @@
 /**
  * Manager for search backends.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,37 +18,36 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search;
 
-use Zend\ServiceManager\ServiceLocatorInterface;
+use Laminas\EventManager\EventInterface;
 
-use Zend\EventManager\SharedListenerAggregateInterface;
-use Zend\EventManager\SharedEventManagerInterface;
-use Zend\EventManager\EventInterface;
-
-use VuFindSearch\Backend\BackendInterface;
+use Laminas\EventManager\SharedEventManagerInterface;
+use Laminas\ServiceManager\ServiceLocatorInterface;
 
 use SplObjectStorage;
+
 use UnexpectedValueException;
+use VuFindSearch\Backend\BackendInterface;
 
 /**
  * Manager for search backends.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class BackendManager implements SharedListenerAggregateInterface
+class BackendManager
 {
     /**
      * Backend registry.
@@ -100,7 +99,7 @@ class BackendManager implements SharedListenerAggregateInterface
      */
     public function get($name)
     {
-        $backend = $this->registry->get($name, false);
+        $backend = $this->registry->get($name);
         if (!is_object($backend)) {
             throw new UnexpectedValueException(
                 sprintf(
@@ -126,7 +125,7 @@ class BackendManager implements SharedListenerAggregateInterface
      *
      * @param string $name Backend name
      *
-     * @return boolean
+     * @return bool
      */
     public function has($name)
     {
@@ -159,11 +158,8 @@ class BackendManager implements SharedListenerAggregateInterface
     public function attachShared(SharedEventManagerInterface $events)
     {
         if (!$this->listeners->offsetExists($events)) {
-            $listener = $events->attach(
-                'VuFind\Search',
-                'resolve',
-                [$this, 'onResolve']
-            );
+            $listener = [$this, 'onResolve'];
+            $events->attach('VuFind\Search', 'resolve', $listener);
             $this->listeners->attach($events, $listener);
         }
     }
@@ -179,7 +175,7 @@ class BackendManager implements SharedListenerAggregateInterface
     {
         if ($this->listeners->offsetExists($events)) {
             $listener = $this->listeners->offsetGet($events);
-            $events->detach('VuFind\Search', $listener);
+            $events->detach($listener, 'VuFind\Search');
             $this->listeners->detach($events);
         }
     }

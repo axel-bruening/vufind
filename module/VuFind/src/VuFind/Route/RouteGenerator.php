@@ -2,7 +2,7 @@
 /**
  * Route Generator Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Route
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Route;
 
@@ -32,11 +32,11 @@ namespace VuFind\Route;
  *
  * The data model object representing a user's book cart.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Route
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class RouteGenerator
 {
@@ -46,7 +46,11 @@ class RouteGenerator
      *
      * @var array
      */
-    protected $nonTabRecordActions;
+    protected $nonTabRecordActions = [
+        'AddComment', 'DeleteComment', 'AddTag', 'DeleteTag', 'Save', 'Email', 'SMS',
+        'Cite', 'Export', 'RDF', 'Hold', 'Home', 'StorageRetrievalRequest',
+        'AjaxTab', 'ILLRequest', 'PDF', 'Epub', 'LinkedText',
+    ];
 
     /**
      * Constructor
@@ -56,15 +60,7 @@ class RouteGenerator
      */
     public function __construct(array $nonTabRecordActions = null)
     {
-        if (null === $nonTabRecordActions) {
-            $this->nonTabRecordActions = [
-                'AddComment', 'DeleteComment', 'AddTag', 'DeleteTag', 'Save',
-                'Email', 'SMS', 'Cite', 'Export', 'RDF', 'Hold', 'BlockedHold',
-                'Home', 'StorageRetrievalRequest', 'AjaxTab',
-                'BlockedStorageRetrievalRequest', 'ILLRequest', 'BlockedILLRequest',
-                'PDF',
-            ];
-        } else {
+        if (null !== $nonTabRecordActions) {
             $this->nonTabRecordActions = $nonTabRecordActions;
         }
     }
@@ -83,7 +79,7 @@ class RouteGenerator
     {
         list($actionName) = explode('/', $action, 2);
         $config['router']['routes'][$routeName] = [
-            'type'    => 'Zend\Mvc\Router\Http\Segment',
+            'type'    => 'Laminas\Router\Http\Segment',
             'options' => [
                 'route'    => "/$controller/$action",
                 'constraints' => [
@@ -130,7 +126,7 @@ class RouteGenerator
     {
         // catch-all "tab" route:
         $config['router']['routes'][$routeBase] = [
-            'type'    => 'Zend\Mvc\Router\Http\Segment',
+            'type'    => 'Laminas\Router\Http\Segment',
             'options' => [
                 'route'    => '/' . $controller . '/[:id[/[:tab]]]',
                 'constraints' => [
@@ -146,7 +142,7 @@ class RouteGenerator
         // special non-tab actions that each need their own route:
         foreach ($this->nonTabRecordActions as $action) {
             $config['router']['routes'][$routeBase . '-' . strtolower($action)] = [
-                'type'    => 'Zend\Mvc\Router\Http\Segment',
+                'type'    => 'Laminas\Router\Http\Segment',
                 'options' => [
                     'route'    => '/' . $controller . '/[:id]/' . $action,
                     'constraints' => [
@@ -191,7 +187,7 @@ class RouteGenerator
         list($controller, $action) = explode('/', $route);
         $routeName = str_replace('/', '-', strtolower($route));
         $config['router']['routes'][$routeName] = [
-            'type' => 'Zend\Mvc\Router\Http\Literal',
+            'type' => 'Laminas\Router\Http\Literal',
             'options' => [
                 'route'    => '/' . $route,
                 'defaults' => [

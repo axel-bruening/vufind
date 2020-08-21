@@ -2,7 +2,7 @@
 /**
  * Class for text messaging via Clickatell's HTTP API
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2009.
  *
@@ -17,47 +17,47 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Ronan McHugh <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\SMS;
+
 use VuFind\Exception\Mail as MailException;
 
 /**
  * Class for text messaging via Clickatell's HTTP API
  *
- * @category VuFind2
+ * @category VuFind
  * @package  SMS
  * @author   Ronan McHugh <vufind-tech@lists.sourceforge.net>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class Clickatell extends AbstractBase
 {
     /**
      * HTTP client
      *
-     * @var \Zend\Http\Client
+     * @var \Laminas\Http\Client
      */
     protected $client;
 
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config  SMS configuration
-     * @param array               $options Additional options (client may be an HTTP
-     * client object)
+     * @param \Laminas\Config\Config $config  SMS configuration
+     * @param array                  $options Additional options (client may be an
+     * HTTP client object)
      */
-    public function __construct(\Zend\Config\Config $config, $options = [])
+    public function __construct(\Laminas\Config\Config $config, $options = [])
     {
         parent::__construct($config, $options);
-        $this->client = isset($options['client'])
-            ? $options['client'] : new \Zend\Http\Client();
+        $this->client = $options['client'] ?? new \Laminas\Http\Client();
     }
 
     /**

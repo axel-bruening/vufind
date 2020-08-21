@@ -4,7 +4,7 @@
  * Trait with utility methods for user creation/management. Assumes that it
  * will be applied to a subclass of DbTestCase.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -19,26 +19,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Unit;
+
 use Behat\Mink\Element\Element;
 
 /**
  * Trait with utility methods for user creation/management. Assumes that it
  * will be applied to a subclass of DbTestCase.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Tests
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:unit_tests Wiki
+ * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 trait UserCreationTrait
 {
@@ -46,9 +47,9 @@ trait UserCreationTrait
      * Static setup support function to fail if users already exist in the database.
      * We want to ensure a clean state for each test!
      *
-     * @return mixed
+     * @return void
      */
-    protected static function failIfUsersExist()
+    protected static function failIfUsersExist(): void
     {
         // If CI is not running, all tests were skipped, so no work is necessary:
         $test = new static();   // create instance of current class
@@ -59,9 +60,10 @@ trait UserCreationTrait
         // on a real system -- it's only meant for the continuous integration server)
         $userTable = $test->getTable('User');
         if (count($userTable->select()) > 0) {
-            return self::fail(
+            self::fail(
                 'Test cannot run with pre-existing user data!'
             );
+            return;
         }
     }
 
@@ -75,7 +77,10 @@ trait UserCreationTrait
      */
     protected function assertLightboxWarning(Element $page, $message)
     {
-        $warning = $this->findCss($page, '.modal-body .alert-danger .message');
+        $warning = $page->find('css', '.modal-body .alert-danger .message');
+        if (!$warning || strlen(trim($warning->getText())) == 0) {
+            $warning = $this->findCss($page, '.modal-body .alert-danger');
+        }
         $this->assertEquals($message, $warning->getText());
     }
 
@@ -99,9 +104,9 @@ trait UserCreationTrait
         ];
 
         foreach ($defaults as $field => $default) {
-            $element = $this->findCss($page, '#account_' . $field);
-            $element->setValue(
-                isset($overrides[$field]) ? $overrides[$field] : $default
+            $this->findCssAndSetValue(
+                $page, '#account_' . $field,
+                $overrides[$field] ?? $default
             );
         }
     }
@@ -112,32 +117,62 @@ trait UserCreationTrait
      * @param Element $page     Page element.
      * @param string  $username Username to set (null to skip)
      * @param string  $password Password to set (null to skip)
+     * @param bool    $inModal  Should we assume the login box is in a lightbox?
+     * @param string  $prefix   Extra selector prefix
      *
      * @return void
      */
-    protected function fillInLoginForm(Element $page, $username, $password)
-    {
+    protected function fillInLoginForm(Element $page, $username, $password,
+        $inModal = true, $prefix = ''
+    ) {
+        $prefix = ($inModal ? '.modal-body ' : '') . $prefix;
         if (null !== $username) {
-            $usernameField = $this->findCss($page, '.modal-body [name="username"]');
-            $usernameField->setValue($username);
+            $this->findCssAndSetValue(
+                $page, $prefix . '[name="username"]', $username
+            );
         }
         if (null !== $password) {
-            $passwordField = $this->findCss($page, '.modal-body [name="password"]');
-            $passwordField->setValue($password);
+            $this->findCssAndSetValue(
+                $page, $prefix . '[name="password"]', $password
+            );
         }
+    }
+
+    /**
+     * Mink support function: fill in the change password form.
+     *
+     * @param Element $page    Page element.
+     * @param string  $old     Old password
+     * @param string  $new     New password
+     * @param bool    $inModal Should we assume the login box is in a lightbox?
+     * @param string  $prefix  Extra selector prefix
+     *
+     * @return void
+     */
+    protected function fillInChangePasswordForm(Element $page, $old, $new,
+        $inModal = false, $prefix = '#newpassword '
+    ) {
+        $prefix = ($inModal ? '.modal-body ' : '') . $prefix;
+        $this->findCssAndSetValue($page, $prefix . '[name="oldpwd"]', $old);
+        $this->findCssAndSetValue($page, $prefix . '[name="password"]', $new);
+        $this->findCssAndSetValue($page, $prefix . '[name="password2"]', $new);
     }
 
     /**
      * Submit the login form (assuming it's open).
      *
-     * @param Element $page Page element.
+     * @param Element $page    Page element.
+     * @param bool    $inModal Should we assume the login box is in a lightbox?
+     * @param string  $prefix  Extra selector prefix
      *
      * @return void
      */
-    protected function submitLoginForm(Element $page)
+    protected function submitLoginForm(Element $page, $inModal = true, $prefix = '')
     {
-        $button = $this->findCss($page, '.modal-body .btn.btn-primary');
+        $prefix = ($inModal ? '.modal-body ' : '') . $prefix;
+        $button = $this->findCss($page, $prefix . 'input.btn.btn-primary');
         $button->click();
+        $this->snooze();
     }
 
     /**

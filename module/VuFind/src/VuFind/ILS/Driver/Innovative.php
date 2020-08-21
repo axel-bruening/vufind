@@ -2,7 +2,7 @@
 /**
  * III ILS Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -17,15 +17,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Adam Brin <abrin@brynmawr.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 namespace VuFind\ILS\Driver;
+
 use VuFind\Exception\ILS as ILSException;
 
 /**
@@ -34,11 +35,11 @@ use VuFind\Exception\ILS as ILSException;
  * This class uses screen scraping techniques to gather record holdings written
  * by Adam Bryn of the Tri-College consortium.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  ILS_Drivers
  * @author   Adam Brin <abrin@brynmawr.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:building_an_ils_driver Wiki
+ * @link     https://vufind.org/wiki/development:plugins:ils_drivers Wiki
  */
 class Innovative extends AbstractBase implements
     \VuFindHttp\HttpServiceAwareInterface
@@ -105,7 +106,7 @@ class Innovative extends AbstractBase implements
         } else {
             // Return digits only.
             $id_ = substr($id, 1);
-        };
+        }
         return $id_;
     }
 
@@ -175,7 +176,7 @@ class Innovative extends AbstractBase implements
                 // replace non blocking space encodings with a space.
                 $cols[$i] = str_replace("&nbsp;", " ", $cols[$i]);
                 // remove html comment tags
-                $cols[$i] = ereg_replace("<!--([^(-->)]*)-->", "", $cols[$i]);
+                $cols[$i] = preg_replace("/<!--([^(-->)]*)-->/", "", $cols[$i]);
                 // Remove closing th or td tag, trim whitespace and decode html
                 // entities
                 $cols[$i] = html_entity_decode(
@@ -186,7 +187,7 @@ class Innovative extends AbstractBase implements
                 // names
                 if ($count == 1) {
                     $keys[$i] = $cols[$i];
-                } else if ($count > 1) { // not the first row, has holding info
+                } elseif ($count > 1) { // not the first row, has holding info
                     //look for location column
                     if (stripos($keys[$i], $loc_col_name) > -1) {
                         $ret[$count - 2]['location'] = strip_tags($cols[$i]);
@@ -266,16 +267,19 @@ class Innovative extends AbstractBase implements
      * This is responsible for retrieving the holding information of a certain
      * record.
      *
-     * @param string $id     The record id to retrieve the holdings for
-     * @param array  $patron Patron data
+     * @param string $id      The record id to retrieve the holdings for
+     * @param array  $patron  Patron data
+     * @param array  $options Extra options (not currently used)
      *
-     * @throws \VuFind\Exception\Date
+     * @throws VuFind\Date\DateException;
      * @throws ILSException
      * @return array         On success, an associative array with the following
      * keys: id, availability (boolean), status, location, reserve, callnumber,
      * duedate, number, barcode.
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getHolding($id, array $patron = null)
+    public function getHolding($id, array $patron = null, array $options = [])
     {
         return $this->getStatus($id);
     }
@@ -356,7 +360,8 @@ class Innovative extends AbstractBase implements
     public function patronLogin($username, $password)
     {
         // TODO: if username is a barcode, test to make sure it fits proper format
-        if ($this->config['PATRONAPI']['enabled'] == 'true') {
+        $enabled = $this->config['PATRONAPI']['enabled'] ?? false;
+        if ($enabled && strtolower($enabled) !== 'false') {
             // use patronAPI to authenticate customer
             $url = $this->config['PATRONAPI']['url'];
 

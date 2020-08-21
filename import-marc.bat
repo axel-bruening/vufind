@@ -10,7 +10,7 @@ rem     Path to the java
 rem INDEX_OPTIONS
 rem     Options to pass to the JVM
 
-rem Make sure that environment edits are local and that we have access to the 
+rem Make sure that environment edits are local and that we have access to the
 rem Windows command extensions.
 setlocal enableextensions
 if not errorlevel 1 goto extensionsokay
@@ -53,37 +53,30 @@ set INDEX_OPTIONS=-Xms512m -Xmx512m -DentityExpansionLimit=0
 rem ##################################################
 rem # Set SOLRCORE
 rem ##################################################
-if not "!%SOLRCORE%!"=="!!" goto solrcorefound
-set SOLRCORE=biblio
-:solrcorefound
+if "!%SOLRCORE%!"=="!!" goto solrcorenotfound
+set EXTRA_SOLRMARC_SETTINGS=%EXTRA_SOLRMARC_SETTINGS%  -Dsolr.core.name=%SOLRCORE%
+:solrcorenotfound
 
 rem ##################################################
-rem # Set SOLR_HOME
+rem # Set VUFIND_HOME
 rem ##################################################
 if not "!%VUFIND_HOME%!"=="!!" goto vufindhomefound
-rem VUFIND_HOME not set -- try to call vufind.bat to 
+rem VUFIND_HOME not set -- try to call env.bat to
 rem fix the problem before we give up completely
-if exist vufind.bat goto usevufindbat
-rem If vufind.bat doesn't exist, the user hasn't run the installer yet.
-echo ERROR: vufind.bat does not exist -- could not set up environment.
+if exist env.bat goto useenvbat
+rem If env.bat doesn't exist, the user hasn't run the installer yet.
+echo WARNING: env.bat does not exist -- trying default environment settings.
 echo Please run "php install.php" to correct this problem.
-goto end
-:usevufindbat
-call vufind > nul
+rem Extract path from current batch file and trim trailing slash:
+set VUFIND_HOME=%~dp0%
+set VUFIND_HOME=%VUFIND_HOME:~0,-1%
+goto vufindhomefound
+:useenvbat
+call env > nul
 if not "!%VUFIND_HOME%!"=="!!" goto vufindhomefound
 echo You need to set the VUFIND_HOME environmental variable before running this script.
 goto end
 :vufindhomefound
-if "!%SOLR_HOME%!"=="!!" goto solrhomenotfound
-set EXTRA_SOLRMARC_SETTINGS=%EXTRA_SOLRMARC_SETTINGS% -Dsolr.path=%SOLR_HOME% -Dsolr.solr.home=%SOLR_HOME% -Dsolrmarc.solr.war.path=%SOLR_HOME%/jetty/webapps/solr.war
-:solrhomenotfound
-
-rem ##################################################
-rem # Set SOLRMARC_HOME
-rem ##################################################
-if "!%SOLRMARC_HOME%!"=="!!" goto solrmarchomenotfound
-set EXTRA_SOLRMARC_SETTINGS=%EXTRA_SOLRMARC_SETTINGS% -Dsolrmarc.path=%SOLRMARC_HOME%
-:solrmarchomenotfound
 
 rem #####################################################
 rem # Build java command
@@ -103,18 +96,30 @@ if not exist %VUFIND_LOCAL_DIR%\import\import.properties goto nolocalproperties
 set PROPERTIES_FILE=%VUFIND_LOCAL_DIR%\import\import.properties
 goto propertiesfound
 :nolocalproperties
+echo WARNING: VUFIND_LOCAL_DIR environment variable is not set. Is this intentional?
 set PROPERTIES_FILE=%VUFIND_HOME%\import\import.properties
 :propertiesfound
 
 rem ##################################################
+rem # Set log4j config file if not already provided
+rem ##################################################
+if defined LOG4J_CONFIG goto log4jfound
+if not exist %VUFIND_LOCAL_DIR%\import\log4j.properties goto nolocallog4j
+set LOG4J_CONFIG=%VUFIND_LOCAL_DIR%\import\log4j.properties
+goto log4jfound
+:nolocallog4j
+set LOG4J_CONFIG=%VUFIND_HOME%\import\log4j.properties
+:log4jfound
+
+rem ##################################################
 rem # Set Command Options
 rem ##################################################
-set JAR_FILE=%VUFIND_HOME%\import\SolrMarc.jar
+for %%a in (%VUFIND_HOME%\import\solrmarc_core_*.jar) do set JAR_FILE=%%a
 
 rem #####################################################
 rem # Execute Importer
 rem #####################################################
-set RUN_CMD=%JAVA% %INDEX_OPTIONS% -Duser.timezone=UTC -Dsolr.core.name=%SOLRCORE% %EXTRA_SOLRMARC_SETTINGS% -jar %JAR_FILE% %PROPERTIES_FILE% %1
+set RUN_CMD=%JAVA% %INDEX_OPTIONS% -Duser.timezone=UTC -Dlog4j.configuration="file:///%LOG4J_CONFIG%" %EXTRA_SOLRMARC_SETTINGS% -jar %JAR_FILE% %PROPERTIES_FILE% -solrj %VUFIND_HOME%\solr\vendor\dist\solrj-lib %1
 echo Now Importing %1 ...
 echo %RUN_CMD%
 %RUN_CMD%

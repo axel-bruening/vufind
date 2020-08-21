@@ -2,7 +2,7 @@
 /**
  * Search results plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,40 +17,109 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\Search\Results;
-use Zend\ServiceManager\ConfigInterface;
 
 /**
  * Search results plugin manager
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:record_drivers Wiki
+ * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'browzine' => \VuFind\Search\BrowZine\Results::class,
+        'combined' => \VuFind\Search\Combined\Results::class,
+        'eds' => \VuFind\Search\EDS\Results::class,
+        'eit' => \VuFind\Search\EIT\Results::class,
+        'emptyset' => \VuFind\Search\EmptySet\Results::class,
+        'favorites' => \VuFind\Search\Favorites\Results::class,
+        'libguides' => \VuFind\Search\LibGuides\Results::class,
+        'mixedlist' => \VuFind\Search\MixedList\Results::class,
+        'pazpar2' => \VuFind\Search\Pazpar2\Results::class,
+        'primo' => \VuFind\Search\Primo\Results::class,
+        'search2' => \VuFind\Search\Search2\Results::class,
+        'search2collection' => \VuFind\Search\Search2Collection\Results::class,
+        'solr' => \VuFind\Search\Solr\Results::class,
+        'solrauth' => \VuFind\Search\SolrAuth\Results::class,
+        'solrauthor' => \VuFind\Search\SolrAuthor\Results::class,
+        'solrauthorfacets' => \VuFind\Search\SolrAuthorFacets\Results::class,
+        'solrcollection' => \VuFind\Search\SolrCollection\Results::class,
+        'solrreserves' => \VuFind\Search\SolrReserves\Results::class,
+        'solrweb' => \VuFind\Search\SolrWeb\Results::class,
+        'summon' => \VuFind\Search\Summon\Results::class,
+        'tags' => \VuFind\Search\Tags\Results::class,
+        'worldcat' => \VuFind\Search\WorldCat\Results::class,
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        \VuFind\Search\BrowZine\Results::class => ResultsFactory::class,
+        \VuFind\Search\Combined\Results::class => ResultsFactory::class,
+        \VuFind\Search\EDS\Results::class => ResultsFactory::class,
+        \VuFind\Search\EIT\Results::class => ResultsFactory::class,
+        \VuFind\Search\EmptySet\Results::class => ResultsFactory::class,
+        \VuFind\Search\Favorites\Results::class =>
+            \VuFind\Search\Favorites\ResultsFactory::class,
+        \VuFind\Search\LibGuides\Results::class => ResultsFactory::class,
+        \VuFind\Search\MixedList\Results::class => ResultsFactory::class,
+        \VuFind\Search\Pazpar2\Results::class => ResultsFactory::class,
+        \VuFind\Search\Primo\Results::class => ResultsFactory::class,
+        \VuFind\Search\Search2\Results::class =>
+            \VuFind\Search\Search2\ResultsFactory::class,
+        \VuFind\Search\Search2Collection\Results::class => ResultsFactory::class,
+        \VuFind\Search\Solr\Results::class =>
+            \VuFind\Search\Solr\ResultsFactory::class,
+        \VuFind\Search\SolrAuth\Results::class => ResultsFactory::class,
+        \VuFind\Search\SolrAuthor\Results::class => ResultsFactory::class,
+        \VuFind\Search\SolrAuthorFacets\Results::class => ResultsFactory::class,
+        \VuFind\Search\SolrCollection\Results::class => ResultsFactory::class,
+        \VuFind\Search\SolrReserves\Results::class => ResultsFactory::class,
+        \VuFind\Search\SolrWeb\Results::class => ResultsFactory::class,
+        \VuFind\Search\Summon\Results::class => ResultsFactory::class,
+        \VuFind\Search\Tags\Results::class =>
+            \VuFind\Search\Tags\ResultsFactory::class,
+        \VuFind\Search\WorldCat\Results::class => ResultsFactory::class,
+    ];
+
+    /**
      * Constructor
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
         // These objects are not meant to be shared -- every time we retrieve one,
         // we are building a brand new object.
-        $this->setShareByDefault(false);
+        $this->sharedByDefault = false;
 
-        parent::__construct($configuration);
+        $this->addAbstractFactory(PluginFactory::class);
+        parent::__construct($configOrContainerInstance, $v3config);
     }
 
     /**
@@ -61,6 +130,6 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      */
     protected function getExpectedInterface()
     {
-        return 'VuFind\Search\Base\Results';
+        return \VuFind\Search\Base\Results::class;
     }
 }

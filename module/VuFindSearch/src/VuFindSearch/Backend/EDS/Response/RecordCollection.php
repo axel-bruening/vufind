@@ -3,7 +3,7 @@
 /**
  * EDS API record collection.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) EBSCO Industries 2013
  *
@@ -18,25 +18,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\EDS\Response;
+
 use VuFindSearch\Response\AbstractRecordCollection;
 
 /**
  * EDS API record collection.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class RecordCollection extends AbstractRecordCollection
 {
@@ -67,14 +68,7 @@ class RecordCollection extends AbstractRecordCollection
      */
     public function getTotal()
     {
-        $totalHits = 0;
-        if (isset($this->response['SearchResult'])
-            && isset($this->response['SearchResult']['Statistics'])
-            && isset($this->response['SearchResult']['Statistics']['TotalHits'])
-        ) {
-            $totalHits = $this->response['SearchResult']['Statistics']['TotalHits'];
-        }
-        return $totalHits;
+        return $this->response['SearchResult']['Statistics']['TotalHits'] ?? 0;
     }
 
     /**
@@ -84,9 +78,7 @@ class RecordCollection extends AbstractRecordCollection
      */
     public function getRawFacets()
     {
-        return isset($this->response['SearchResult'])
-            && isset($this->response['SearchResult']['AvailableFacets'])
-            ? $this->response['SearchResult']['AvailableFacets'] : [];
+        return $this->response['SearchResult']['AvailableFacets'] ?? [];
     }
 
     /**
@@ -97,9 +89,7 @@ class RecordCollection extends AbstractRecordCollection
     public function getFacets()
     {
         $vufindFacetList = [];
-        $facets = isset($this->response['SearchResult'])
-            && isset($this->response['SearchResult']['AvailableFacets'])
-            ? $this->response['SearchResult']['AvailableFacets'] : [];
+        $facets = $this->response['SearchResult']['AvailableFacets'] ?? [];
         foreach ($facets as $facet) {
             $vufindFacet['displayName'] = $facet['Id'];
             $vufindFacet['displayText'] = $facet['Label'];
@@ -111,7 +101,6 @@ class RecordCollection extends AbstractRecordCollection
                     'count' => $availableFacetValue['Count'],
                     'displayText' => $availableFacetValue['Value']
                 ];
-
             }
             $vufindFacet['counts'] = $values;
             $vufindFacetList[$facet['Id']] = $vufindFacet;
@@ -140,5 +129,4 @@ class RecordCollection extends AbstractRecordCollection
         }
         return 0;
     }
-
 }

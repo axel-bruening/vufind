@@ -2,7 +2,7 @@
 /**
  * VuFind Theme Initializer
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,30 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Theme
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFindTheme;
-use Zend\Config\Config,
-    Zend\Mvc\MvcEvent,
-    Zend\Stdlib\RequestInterface as Request;
+
+use Interop\Container\ContainerInterface;
+use Laminas\Config\Config;
+use Laminas\Mvc\MvcEvent;
+use Laminas\Stdlib\RequestInterface as Request;
+use Laminas\View\Resolver\TemplatePathStack;
 
 /**
  * VuFind Theme Initializer
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Theme
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class Initializer
 {
@@ -49,7 +52,7 @@ class Initializer
     protected $config;
 
     /**
-     * Zend MVC Event
+     * Laminas MVC Event
      *
      * @var MvcEvent
      */
@@ -58,7 +61,7 @@ class Initializer
     /**
      * Top-level service manager
      *
-     * @var \Zend\ServiceManager\ServiceManager
+     * @var \Laminas\ServiceManager\ServiceManager
      */
     protected $serviceManager;
 
@@ -84,9 +87,17 @@ class Initializer
     protected $cookieManager;
 
     /**
+     * A static flag used to determine if the theme has been initialized
+     *
+     * @var bool
+     */
+    protected static $themeInitialized = false;
+
+    /**
      * Constructor
      *
-     * @param Config   $config Configuration object containing these keys:
+     * @param Config                      $config           Configuration object
+     * containing these keys:
      * <ul>
      *   <li>theme - the name of the default theme for non-mobile devices</li>
      *   <li>mobile_theme - the name of the default theme for mobile devices
@@ -101,71 +112,37 @@ class Initializer
      *   <li>generator - a Generator value to display in the HTML header
      * (optional)</li>
      * </ul>
-     * @param MvcEvent $event  Zend MVC Event object
+     * @param MvcEvent|ContainerInterface $eventOrContainer Laminas MVC Event object
+     * OR service container object
      */
-    public function __construct(Config $config, MvcEvent $event)
+    public function __construct(Config $config, $eventOrContainer)
     {
         // Store parameters:
         $this->config = $config;
-        $this->event = $event;
 
-        // Grab the service manager for convenience:
-        $this->serviceManager = $this->event->getApplication()->getServiceManager();
+        if ($eventOrContainer instanceof MvcEvent) {
+            $this->event = $eventOrContainer;
+            $this->serviceManager = $this->event->getApplication()
+                ->getServiceManager();
+        } elseif ($eventOrContainer instanceof ContainerInterface) {
+            $this->event = null;
+            $this->serviceManager = $eventOrContainer;
+        } else {
+            throw new \Exception(
+                'Illegal type for $eventOrContainer: ' . get_class($eventOrContainer)
+            );
+        }
 
         // Get the cookie manager from the service manager:
-        $this->cookieManager = $this->serviceManager->get('VuFind\CookieManager');
+        $this->cookieManager = $this->serviceManager
+            ->get(\VuFind\Cookie\CookieManager::class);
 
         // Get base directory from tools object:
-        $this->tools = $this->serviceManager->get('VuFindTheme\ThemeInfo');
+        $this->tools = $this->serviceManager->get(\VuFindTheme\ThemeInfo::class);
 
         // Set up mobile device detector:
-        $this->mobile = $this->serviceManager->get('VuFindTheme\Mobile');
+        $this->mobile = $this->serviceManager->get(\VuFindTheme\Mobile::class);
         $this->mobile->enable(isset($this->config->mobile_theme));
-    }
-
-    /**
-     * Adjust template injection to a strategy that works better with our themes.
-     * This needs to be called prior to the dispatch event, which is why it is a
-     * separate static method rather than part of the init() method below.
-     *
-     * @param MvcEvent $event Dispatch event object
-     *
-     * @return void
-     */
-    public static function configureTemplateInjection(MvcEvent $event)
-    {
-        // Get access to the shared event manager:
-        $sharedEvents
-            = $event->getApplication()->getEventManager()->getSharedManager();
-
-        // Detach the default listener:
-        $listeners = $sharedEvents->getListeners(
-            'Zend\Stdlib\DispatchableInterface', MvcEvent::EVENT_DISPATCH
-        );
-        foreach ($listeners as $listener) {
-            $metadata = $listener->getMetadata();
-            $callback = $listener->getCallback();
-            if (is_a($callback[0], 'Zend\Mvc\View\Http\InjectTemplateListener')) {
-                $priority = $metadata['priority'];
-                $sharedEvents->detach(
-                    'Zend\Stdlib\DispatchableInterface', $listener
-                );
-                break;
-            }
-        }
-
-        // If we didn't successfully detach a listener above, priority will not be
-        // set.  This is an unexpected situation, so we should throw an exception.
-        if (!isset($priority)) {
-            throw new \Exception('Unable to detach InjectTemplateListener');
-        }
-
-        // Attach our own listener in place of the one we removed:
-        $injectTemplateListener  = new InjectTemplateListener();
-        $sharedEvents->attach(
-            'Zend\Stdlib\DispatchableInterface', MvcEvent::EVENT_DISPATCH,
-            [$injectTemplateListener, 'injectTemplate'], $priority
-        );
     }
 
     /**
@@ -177,8 +154,16 @@ class Initializer
      */
     public function init()
     {
+        // Make sure to initialize the theme just once
+        if (self::$themeInitialized) {
+            return;
+        }
+        self::$themeInitialized = true;
+
         // Determine the current theme:
-        $currentTheme = $this->pickTheme($this->event->getRequest());
+        $currentTheme = $this->pickTheme(
+            isset($this->event) ? $this->event->getRequest() : null
+        );
 
         // Determine theme options:
         $this->sendThemeOptionsToView();
@@ -206,24 +191,30 @@ class Initializer
     /**
      * Support method for init() -- figure out which theme option is active.
      *
-     * @param Request $request Request object (for obtaining user parameters).
+     * @param Request $request Request object (for obtaining user parameters);
+     * set to null if no request context is available.
      *
      * @return string
      */
-    protected function pickTheme(Request $request)
+    protected function pickTheme(?Request $request)
     {
         // Load standard configuration options:
         $standardTheme = $this->config->theme;
+        if (PHP_SAPI == 'cli') {
+            return $standardTheme;
+        }
         $mobileTheme = $this->mobile->enabled()
             ? $this->config->mobile_theme : false;
 
         // Find out if the user has a saved preference in the POST, URL or cookies:
-        $selectedUI = $request->getPost()->get(
-            'ui', $request->getQuery()->get(
-                'ui', isset($request->getCookie()->ui)
-                ? $request->getCookie()->ui : null
-            )
-        );
+        if (isset($request)) {
+            $selectedUI = $request->getPost()->get(
+                'ui', $request->getQuery()->get(
+                    'ui', isset($request->getCookie()->ui)
+                    ? $request->getCookie()->ui : null
+                )
+            );
+        }
         if (empty($selectedUI)) {
             $selectedUI = ($mobileTheme && $this->mobile->detect())
                 ? 'mobile' : 'standard';
@@ -267,10 +258,12 @@ class Initializer
     protected function sendThemeOptionsToView()
     {
         // Get access to the view model:
-        $viewModel = $this->serviceManager->get('viewmanager')->getViewModel();
+        if (PHP_SAPI !== 'cli') {
+            $viewModel = $this->serviceManager->get('ViewManager')->getViewModel();
 
-        // Send down the view options:
-        $viewModel->setVariable('themeOptions', $this->getThemeOptions());
+            // Send down the view options:
+            $viewModel->setVariable('themeOptions', $this->getThemeOptions());
+        }
     }
 
     /**
@@ -310,10 +303,10 @@ class Initializer
     protected function setUpThemeViewHelpers($helpers)
     {
         // Grab the helper loader from the view manager:
-        $loader = $this->serviceManager->get('viewmanager')->getHelperManager();
+        $loader = $this->serviceManager->get('ViewHelperManager');
 
         // Register all the helpers:
-        $config = new \Zend\ServiceManager\Config($helpers);
+        $config = new \Laminas\ServiceManager\Config($helpers);
         $config->configureServiceManager($loader);
     }
 
@@ -329,7 +322,8 @@ class Initializer
         $templatePathStack = [];
 
         // Grab the resource manager for tracking CSS, JS, etc.:
-        $resources = $this->serviceManager->get('VuFindTheme\ResourceContainer');
+        $resources = $this->serviceManager
+            ->get(\VuFindTheme\ResourceContainer::class);
 
         // Set generator if necessary:
         if (isset($this->config->generator)) {
@@ -375,16 +369,9 @@ class Initializer
             }
         }
 
-        // Inject the path stack generated above into the view resolver:
-        $resolver = $this->serviceManager->get('viewmanager')->getResolver();
-        if (!is_a($resolver, 'Zend\View\Resolver\AggregateResolver')) {
-            throw new \Exception('Unexpected resolver: ' . get_class($resolver));
-        }
-        foreach ($resolver as $current) {
-            if (is_a($current, 'Zend\View\Resolver\TemplatePathStack')) {
-                $current->setPaths($templatePathStack);
-            }
-        }
+        // Inject the path stack generated above into the resolver:
+        $resolver = $this->serviceManager->get(TemplatePathStack::class);
+        $resolver->setPaths($templatePathStack);
 
         // Add theme specific language files for translation
         $this->updateTranslator($themes);
@@ -410,11 +397,11 @@ class Initializer
 
         if (!empty($pathStack)) {
             try {
-                $translator = $this->serviceManager->get('VuFind\Translator');
-
+                $translator = $this->serviceManager
+                    ->get(\Laminas\Mvc\I18n\Translator::class);
                 $pm = $translator->getPluginManager();
-                $pm->get('extendedini')->addToPathStack($pathStack);
-            } catch (\Zend\Mvc\Exception\BadMethodCallException $e) {
+                $pm->get('ExtendedIni')->addToPathStack($pathStack);
+            } catch (\Laminas\Mvc\I18n\Exception\BadMethodCallException $e) {
                 // This exception likely indicates that translation is disabled,
                 // so we can't proceed.
                 return;
@@ -423,13 +410,14 @@ class Initializer
             // Override the default cache with a theme-specific cache to avoid
             // key collisions in a multi-theme environment.
             try {
-                $cacheManager = $this->serviceManager->get('VuFind\CacheManager');
+                $cacheManager = $this->serviceManager
+                    ->get(\VuFind\Cache\Manager::class);
                 $cacheName = $cacheManager->addLanguageCacheForTheme($theme);
                 $translator->setCache($cacheManager->getCache($cacheName));
             } catch (\Exception $e) {
                 // Don't let a cache failure kill the whole application, but make
                 // note of it:
-                $logger = $this->serviceManager->get('VuFind\Logger');
+                $logger = $this->serviceManager->get(\VuFind\Log\Logger::class);
                 $logger->debug(
                     'Problem loading cache: ' . get_class($e) . ' exception: '
                     . $e->getMessage()

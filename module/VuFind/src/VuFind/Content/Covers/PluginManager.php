@@ -2,7 +2,7 @@
 /**
  * Covers content loader plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,27 +17,72 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Content
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 namespace VuFind\Content\Covers;
+
+use Laminas\ServiceManager\Factory\InvokableFactory;
+use VuFind\Content\ObalkyKnihContentFactory;
 
 /**
  * Covers content loader plugin manager
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Content
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
+    /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        Amazon::class => Deprecated::class,
+        'amazon' => Deprecated::class,
+        'booksite' => Booksite::class,
+        'buchhandel' => Buchhandel::class,
+        'browzine' => BrowZine::class,
+        'contentcafe' => ContentCafe::class,
+        'google' => Google::class,
+        'librarything' => LibraryThing::class,
+        'localfile' => LocalFile::class,
+        'obalkyknih' => ObalkyKnih::class,
+        'openlibrary' => OpenLibrary::class,
+        'summon' => Summon::class,
+        'syndetics' => Syndetics::class,
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        Amazon::class => AmazonFactory::class,
+        Booksite::class => BooksiteFactory::class,
+        BrowZine::class => BrowZineFactory::class,
+        Buchhandel::class => BuchhandelFactory::class,
+        ContentCafe::class => ContentCafeFactory::class,
+        Deprecated::class => InvokableFactory::class,
+        Google::class => InvokableFactory::class,
+        LibraryThing::class => InvokableFactory::class,
+        LocalFile::class => InvokableFactory::class,
+        ObalkyKnih::class => ObalkyKnihContentFactory::class,
+        OpenLibrary::class => InvokableFactory::class,
+        Summon::class => InvokableFactory::class,
+        Syndetics::class => SyndeticsFactory::class,
+    ];
+
     /**
      * Return the name of the base class or interface that plug-ins must conform
      * to.
@@ -46,6 +91,6 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      */
     protected function getExpectedInterface()
     {
-        return 'VuFind\Content\AbstractCover';
+        return \VuFind\Content\AbstractCover::class;
     }
 }

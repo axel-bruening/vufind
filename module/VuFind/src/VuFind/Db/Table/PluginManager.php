@@ -2,7 +2,7 @@
 /**
  * Database table plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,44 +17,88 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:database_gateways Wiki
+ * @link     https://vufind.org/wiki/development:plugins:database_gateways Wiki
  */
 namespace VuFind\Db\Table;
-use Zend\ServiceManager\ConfigInterface;
 
 /**
  * Database table plugin manager
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:database_gateways Wiki
+ * @link     https://vufind.org/wiki/development:plugins:database_gateways Wiki
  */
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'changetracker' => ChangeTracker::class,
+        'comments' => Comments::class,
+        'externalsession' => ExternalSession::class,
+        'oairesumption' => OaiResumption::class,
+        'record' => Record::class,
+        'resource' => Resource::class,
+        'resourcetags' => ResourceTags::class,
+        'search' => Search::class,
+        'session' => Session::class,
+        'shortlinks' => Shortlinks::class,
+        'tags' => Tags::class,
+        'user' => User::class,
+        'usercard' => UserCard::class,
+        'userlist' => UserList::class,
+        'userresource' => UserResource::class,
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        AuthHash::class => GatewayFactory::class,
+        ChangeTracker::class => GatewayFactory::class,
+        Comments::class => GatewayFactory::class,
+        ExternalSession::class => GatewayFactory::class,
+        OaiResumption::class => GatewayFactory::class,
+        Record::class => GatewayFactory::class,
+        Resource::class => ResourceFactory::class,
+        ResourceTags::class => CaseSensitiveTagsFactory::class,
+        Search::class => GatewayFactory::class,
+        Session::class => GatewayFactory::class,
+        Shortlinks::class => GatewayFactory::class,
+        Tags::class => CaseSensitiveTagsFactory::class,
+        User::class => UserFactory::class,
+        UserCard::class => GatewayFactory::class,
+        UserList::class => UserListFactory::class,
+        UserResource::class => GatewayFactory::class,
+    ];
+
+    /**
      * Constructor
      *
-     * Make sure table gateways are properly initialized.
+     * Make sure plugins are properly initialized.
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
-        parent::__construct($configuration);
-        $initializer = function ($instance, $manager) {
-            $instance
-                ->setAdapter($manager->getServiceLocator()->get('VuFind\DbAdapter'));
-            $instance->initialize();
-        };
-        $this->addInitializer($initializer, false);
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
+        $this->addAbstractFactory(PluginFactory::class);
+        parent::__construct($configOrContainerInstance, $v3config);
     }
 
     /**
@@ -65,6 +109,6 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      */
     protected function getExpectedInterface()
     {
-        return 'VuFind\Db\Table\Gateway';
+        return Gateway::class;
     }
 }

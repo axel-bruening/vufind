@@ -1,8 +1,9 @@
 <?php
 /**
- * Database utility class.
+ * Database utility class. May be used as a service or as a standard
+ * Laminas factory.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,47 +18,77 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Db;
-use Zend\Db\Adapter\Adapter;
+
+use Interop\Container\ContainerInterface;
+use Laminas\Config\Config;
+use Laminas\Db\Adapter\Adapter;
 
 /**
- * Database utility class.
+ * Database utility class. May be used as a service or as a standard
+ * Laminas factory.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
-class AdapterFactory
+class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
 {
     /**
      * VuFind configuration
      *
-     * @var \Zend\Config\Config
+     * @var Config
      */
     protected $config;
 
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config VuFind configuration
+     * @param Config $config VuFind configuration (provided when used as service;
+     * omitted when used as factory)
      */
-    public function __construct(\Zend\Config\Config $config)
+    public function __construct(Config $config = null)
     {
-        $this->config = $config;
+        $this->config = $config ?: new Config([]);
     }
 
     /**
-     * Obtain a Zend\DB connection using standard VuFind configuration.
+     * Create an object (glue code for FactoryInterface compliance)
+     *
+     * @param ContainerInterface $container     Service manager
+     * @param string             $requestedName Service being created
+     * @param null|array         $options       Extra options (optional)
+     *
+     * @return object
+     *
+     * @throws ServiceNotFoundException if unable to resolve the service.
+     * @throws ServiceNotCreatedException if an exception is raised when
+     * creating a service.
+     * @throws ContainerException if any other error occurs
+     */
+    public function __invoke(ContainerInterface $container, $requestedName,
+        array $options = null
+    ) {
+        if (!empty($options)) {
+            throw new \Exception('Unexpected options sent to factory!');
+        }
+        $this->config = $container->get(\VuFind\Config\PluginManager::class)
+            ->get('config');
+        return $this->getAdapter();
+    }
+
+    /**
+     * Obtain a Laminas\DB connection using standard VuFind configuration.
      *
      * @param string $overrideUser Username override (leave null to use username
      * from config.ini)
@@ -69,6 +100,9 @@ class AdapterFactory
     public function getAdapter($overrideUser = null, $overridePass = null)
     {
         // Parse details from connection string:
+        if (!isset($this->config->Database->database)) {
+            throw new \Exception('"database" setting missing');
+        }
         return $this->getAdapterFromConnectionString(
             $this->config->Database->database, $overrideUser, $overridePass
         );
@@ -95,7 +129,7 @@ class AdapterFactory
     }
 
     /**
-     * Obtain a Zend\DB connection using an option array.
+     * Obtain a Laminas\DB connection using an option array.
      *
      * @param array $options Options for building adapter
      *
@@ -129,7 +163,7 @@ class AdapterFactory
     }
 
     /**
-     * Obtain a Zend\DB connection using a connection string.
+     * Obtain a Laminas\DB connection using a connection string.
      *
      * @param string $connectionString Connection string of the form
      * [db_type]://[username]:[password]@[host]/[db_name]
@@ -145,27 +179,35 @@ class AdapterFactory
     ) {
         list($type, $details) = explode('://', $connectionString);
         preg_match('/(.+)@([^@]+)\/(.+)/', $details, $matches);
-        $credentials = isset($matches[1]) ? $matches[1] : null;
-        $host = isset($matches[2]) ? $matches[2] : null;
-        $dbName = isset($matches[3]) ? $matches[3] : null;
+        $credentials = $matches[1] ?? null;
+        if (isset($matches[2])) {
+            if (strpos($matches[2], ':') !== false) {
+                list($host, $port) = explode(':', $matches[2]);
+            } else {
+                $host = $matches[2];
+            }
+        }
+        $dbName = $matches[3] ?? null;
         if (strstr($credentials, ':')) {
             list($username, $password) = explode(':', $credentials, 2);
         } else {
             $username = $credentials;
             $password = null;
         }
-        $username = !is_null($overrideUser) ? $overrideUser : $username;
-        $password = !is_null($overridePass) ? $overridePass : $password;
+        $username = null !== $overrideUser ? $overrideUser : $username;
+        $password = null !== $overridePass ? $overridePass : $password;
 
         // Set up default options:
         $options = [
             'driver' => $this->getDriverName($type),
-            'hostname' => $host,
+            'hostname' => $host ?? null,
             'username' => $username,
             'password' => $password,
             'database' => $dbName
         ];
-
+        if (!empty($port)) {
+            $options['port'] = $port;
+        }
         return $this->getAdapterFromOptions($options);
     }
 }

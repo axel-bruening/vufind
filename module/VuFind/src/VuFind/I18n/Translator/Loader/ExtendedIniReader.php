@@ -2,7 +2,7 @@
 /**
  * Helper class to load .ini files from disk.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,25 +17,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\I18n\Translator\Loader;
-use Zend\I18n\Translator\TextDomain;
+
+use Laminas\I18n\Translator\TextDomain;
 
 /**
  * Helper class to load .ini files from disk.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Translator
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class ExtendedIniReader
 {
@@ -69,8 +70,8 @@ class ExtendedIniReader
 
                         // Store the key/value pair (allow empty values -- sometimes
                         // we want to replace a language token with a blank string,
-                        // but Zend translator doesn't support them so replace with
-                        // a zero-width non-joiner):
+                        // but Laminas translator doesn't support them so replace
+                        // with a zero-width non-joiner):
                         if ($convertBlanks && $value === '') {
                             $value = html_entity_decode(
                                 '&#x200C;', ENT_NOQUOTES, 'UTF-8'

@@ -2,7 +2,7 @@
 /**
  * Solr Collection aspect of the Search Multi-class (Options)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_SolrAuthor
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\SolrCollection;
 
 /**
  * Solr Collection Search Options
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search_SolrAuthor
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class Options extends \VuFind\Search\Solr\Options
 {
@@ -45,6 +45,7 @@ class Options extends \VuFind\Search\Solr\Options
      */
     public function __construct(\VuFind\Config\PluginManager $configLoader)
     {
+        $this->facetsIni = 'Collection';
         parent::__construct($configLoader);
 
         // Load sort preferences (or defaults if none in .ini file):
@@ -65,6 +66,17 @@ class Options extends \VuFind\Search\Solr\Options
     }
 
     /**
+     * Return the route name for the facet list action. Returns false to cover
+     * unimplemented support.
+     *
+     * @return string|bool
+     */
+    public function getFacetListAction()
+    {
+        return 'search-collectionfacetlist';
+    }
+
+    /**
      * Load all recommendation settings from the relevant ini file.  Returns an
      * associative array where the key is the location of the recommendations (top
      * or side) and the value is the settings found in the file (which may be either
@@ -81,5 +93,15 @@ class Options extends \VuFind\Search\Solr\Options
         return isset($searchSettings->Recommend)
             ? $searchSettings->Recommend->toArray()
             : ['side' => ['CollectionSideFacets:Facets::Collection:true']];
+    }
+
+    /**
+     * Return the route name for the search results action.
+     *
+     * @return string
+     */
+    public function getSearchAction()
+    {
+        return 'collection';
     }
 }

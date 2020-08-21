@@ -3,9 +3,9 @@
 /**
  * Unit tests for Hierarchical Facet Helper.
  *
- * PHP version 5
+ * PHP version 7
  *
- * Copyright (C) The National Library of Finland 2014.
+ * Copyright (C) The National Library of Finland 2014-2020.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -18,31 +18,36 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFindTest\Search\Solr;
 
-use VuFindTest\Unit\TestCase;
 use VuFind\Search\Solr\HierarchicalFacetHelper;
+use VuFindTest\Unit\TestCase;
 
 /**
  * Unit tests for Hierarchical Facet Helper.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  * @todo     Test buildFacetArray using url helper
  */
 class HierarchicalFacetHelperTest extends TestCase
 {
+    /**
+     * Test input data.
+     *
+     * @var array
+     */
     protected $facetList = [
         [
             'value' => '0/Book/',
@@ -107,15 +112,45 @@ class HierarchicalFacetHelperTest extends TestCase
      *
      * @return void
      */
-    protected function setup()
+    protected function setUp(): void
     {
         $this->helper = new HierarchicalFacetHelper();
     }
 
     /**
-     * Tests for sortFacetList (top level only)
+     * Tests for sortFacetList (default/count sort -- at present these should
+     * make no changes to the input data and can thus both be tested in a single
+     * test method).
+     *
+     * @return void
      */
-    public function testSortFacetListTopLevel()
+    public function testSortFacetListDefault()
+    {
+        $facetList = $this->facetList;
+        $this->helper->sortFacetList($facetList);
+        $this->assertEquals($facetList[0]['value'], '0/Book/');
+        $this->assertEquals($facetList[1]['value'], '0/AV/');
+        $this->assertEquals($facetList[2]['value'], '0/Audio/');
+        $this->assertEquals($facetList[3]['value'], '1/Book/BookPart/');
+        $this->assertEquals($facetList[4]['value'], '1/Book/Section/');
+        $this->assertEquals($facetList[5]['value'], '1/Audio/Spoken/');
+        $this->assertEquals($facetList[6]['value'], '1/Audio/Music/');
+        $this->helper->sortFacetList($facetList, 'count');
+        $this->assertEquals($facetList[0]['value'], '0/Book/');
+        $this->assertEquals($facetList[1]['value'], '0/AV/');
+        $this->assertEquals($facetList[2]['value'], '0/Audio/');
+        $this->assertEquals($facetList[3]['value'], '1/Book/BookPart/');
+        $this->assertEquals($facetList[4]['value'], '1/Book/Section/');
+        $this->assertEquals($facetList[5]['value'], '1/Audio/Spoken/');
+        $this->assertEquals($facetList[6]['value'], '1/Audio/Music/');
+    }
+
+    /**
+     * Tests for sortFacetList (top level only, specified with boolean)
+     *
+     * @return void
+     */
+    public function testSortFacetListTopLevelBooleanTrue()
     {
         $facetList = $this->facetList;
         $this->helper->sortFacetList($facetList, true);
@@ -129,9 +164,29 @@ class HierarchicalFacetHelperTest extends TestCase
     }
 
     /**
-     * Tests for sortFacetList (all levels)
+     * Tests for sortFacetList (top level only, specified with string)
+     *
+     * @return void
      */
-    public function testSortFacetListAllLevels()
+    public function testSortFacetListTopLevelStringConfig()
+    {
+        $facetList = $this->facetList;
+        $this->helper->sortFacetList($facetList, 'top');
+        $this->assertEquals($facetList[0]['value'], '0/AV/');
+        $this->assertEquals($facetList[1]['value'], '0/Book/');
+        $this->assertEquals($facetList[2]['value'], '0/Audio/');
+        $this->assertEquals($facetList[3]['value'], '1/Book/BookPart/');
+        $this->assertEquals($facetList[4]['value'], '1/Book/Section/');
+        $this->assertEquals($facetList[5]['value'], '1/Audio/Spoken/');
+        $this->assertEquals($facetList[6]['value'], '1/Audio/Music/');
+    }
+
+    /**
+     * Tests for sortFacetList (all levels, specified with boolean)
+     *
+     * @return void
+     */
+    public function testSortFacetListAllLevelsBooleanFalse()
     {
         $facetList = $this->facetList;
         $this->helper->sortFacetList($facetList, false);
@@ -145,7 +200,27 @@ class HierarchicalFacetHelperTest extends TestCase
     }
 
     /**
+     * Tests for sortFacetList (all levels, specified with string)
+     *
+     * @return void
+     */
+    public function testSortFacetListAllLevelsStringConfig()
+    {
+        $facetList = $this->facetList;
+        $this->helper->sortFacetList($facetList, 'all');
+        $this->assertEquals($facetList[0]['value'], '0/AV/');
+        $this->assertEquals($facetList[1]['value'], '0/Book/');
+        $this->assertEquals($facetList[2]['value'], '0/Audio/');
+        $this->assertEquals($facetList[3]['value'], '1/Book/BookPart/');
+        $this->assertEquals($facetList[4]['value'], '1/Book/Section/');
+        $this->assertEquals($facetList[5]['value'], '1/Audio/Music/');
+        $this->assertEquals($facetList[6]['value'], '1/Audio/Spoken/');
+    }
+
+    /**
      * Tests for buildFacetArray
+     *
+     * @return void
      */
     public function testBuildFacetArray()
     {
@@ -179,11 +254,12 @@ class HierarchicalFacetHelperTest extends TestCase
             $facetList[0]['children'][0]['value'], '1/Book/BookPart/'
         );
         $this->assertEquals($facetList[0]['children'][0]['isApplied'], true);
-
     }
 
     /**
      * Tests for flattenFacetHierarchy
+     *
+     * @return void
      */
     public function testFlattenFacetHierarchy()
     {
@@ -203,6 +279,8 @@ class HierarchicalFacetHelperTest extends TestCase
 
     /**
      * Tests for formatDisplayText
+     *
+     * @return void
      */
     public function testFormatDisplayText()
     {
@@ -235,6 +313,35 @@ class HierarchicalFacetHelperTest extends TestCase
         $this->assertEquals(
             (string)$this->helper->formatDisplayText('1/Sound/Noisy/', true, ' - '),
             '1/Sound/Noisy/'
+        );
+    }
+
+    /**
+     * Tests for isDeepestFacetLevel
+     *
+     * @return void
+     */
+    public function testIsDeepestFacetLevel()
+    {
+        $facetList = [
+            '0/Audio/',
+            '1/Audio/Music/',
+            '0/AV/',
+        ];
+        $this->assertFalse(
+            $this->helper->isDeepestFacetLevel($facetList, '0/Audio/')
+        );
+        $this->assertTrue(
+            $this->helper->isDeepestFacetLevel($facetList, '1/Audio/Music/')
+        );
+        $this->assertTrue(
+            $this->helper->isDeepestFacetLevel($facetList, '0/AV/')
+        );
+        $this->assertTrue(
+            $this->helper->isDeepestFacetLevel($facetList, '0/XYZZY/')
+        );
+        $this->assertTrue(
+            $this->helper->isDeepestFacetLevel($facetList, 'XYZ')
         );
     }
 

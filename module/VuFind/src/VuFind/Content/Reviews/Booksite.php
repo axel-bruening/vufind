@@ -2,7 +2,7 @@
 /**
  * Booksite review content loader.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Content
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\Content\Reviews;
 
 /**
  * Booksite review content loader.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Content
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class BookSite extends \VuFind\Content\AbstractBase
 {
@@ -101,8 +101,8 @@ class BookSite extends \VuFind\Content\AbstractBase
         $i = 0;
         $json = json_decode($response->getBody());
         foreach ($json as $source => $values) {
-            $reviews[$i]['Source' ] = $source;
-            $reviews[$i]['Date'   ] = (string)$values->reviewDate;
+            $reviews[$i]['Source'] = $source;
+            $reviews[$i]['Date'] = (string)$values->reviewDate;
             $reviews[$i]['Content'] = (string)$values->reviewText;
             $i++;
         }

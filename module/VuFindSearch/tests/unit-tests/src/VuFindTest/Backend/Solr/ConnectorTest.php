@@ -3,7 +3,7 @@
 /**
  * Unit tests for SOLR connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,35 +18,35 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\Solr;
+
+use InvalidArgumentException;
+use Laminas\Http\Client\Adapter\Test as TestAdapter;
+
+use Laminas\Http\Client as HttpClient;
+use PHPUnit\Framework\TestCase;
 
 use VuFindSearch\Backend\Solr\Connector;
 use VuFindSearch\Backend\Solr\HandlerMap;
 
-use Zend\Http\Client\Adapter\Test as TestAdapter;
-use Zend\Http\Client as HttpClient;
-
-use PHPUnit_Framework_TestCase;
-use InvalidArgumentException;
-
 /**
  * Unit tests for SOLR connector.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class ConnectorTest extends PHPUnit_Framework_TestCase
+class ConnectorTest extends TestCase
 {
     /**
      * Current response.
@@ -64,7 +64,7 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
     {
         $conn = $this->createConnector('single-record');
         $resp = $conn->retrieve('id');
-        $this->assertInternalType('string', $resp);
+        $this->assertIsString($resp);
         json_decode($resp, true);
         $this->assertEquals(\JSON_ERROR_NONE, json_last_error());
     }
@@ -78,19 +78,19 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
     {
         $conn = $this->createConnector('no-match');
         $resp = $conn->retrieve('id');
-        $this->assertInternalType('string', $resp);
+        $this->assertIsString($resp);
     }
 
     /**
      * Test RemoteErrorException is thrown on a remote 5xx error.
      *
      * @return void
-     *
-     * @expectedException     VuFindSearch\Backend\Exception\RemoteErrorException
-     * @expectedExceptionCode 500
      */
     public function testInternalServerError()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\RemoteErrorException::class);
+        $this->expectExceptionCode(500);
+
         $conn = $this->createConnector('internal-server-error');
         $resp = $conn->retrieve('id');
     }
@@ -99,12 +99,12 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
      * Test RequestErrorException is thrown on a remote 4xx error.
      *
      * @return void
-     *
-     * @expectedException     VuFindSearch\Backend\Exception\RequestErrorException
-     * @expectedExceptionCode 400
      */
     public function testBadRequestError()
     {
+        $this->expectException(\VuFindSearch\Backend\Exception\RequestErrorException::class);
+        $this->expectExceptionCode(400);
+
         $conn = $this->createConnector('bad-request');
         $resp = $conn->retrieve('id');
     }
@@ -113,12 +113,12 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
      * Test InvalidArgumentException invalid adapter object.
      *
      * @return void
-     *
-     * @expectedException        InvalidArgumentException
-     * @expectedExceptionMessage AdapterInterface
      */
     public function testSetAdapterThrowsInvalidObject()
     {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('AdapterInterface');
+
         $conn = $this->createConnector('single-record');
         $conn->setAdapter($this);
     }
@@ -127,14 +127,14 @@ class ConnectorTest extends PHPUnit_Framework_TestCase
      * Test InvalidArgumentException unknown serialization format.
      *
      * @return void
-     *
-     * @expectedException        InvalidArgumentException
-     * @expectedExceptionMessage Unable to serialize
      */
     public function testSaveThrowsUnknownFormat()
     {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unable to serialize');
+
         $conn = $this->createConnector();
-        $document = $this->getMock('VuFindSearch\Backend\Solr\Document\UpdateDocument');
+        $document = $this->createMock(\VuFindSearch\Backend\Solr\Document\UpdateDocument::class);
         $conn->write($document, 'unknown', 'update');
     }
 

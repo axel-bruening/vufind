@@ -2,7 +2,7 @@
 /**
  * Table Definition for user_resource
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,34 +17,44 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Db\Table;
-use Zend\Db\Sql\Expression;
+
+use Laminas\Db\Adapter\Adapter;
+use Laminas\Db\Sql\Expression;
+use VuFind\Db\Row\RowGateway;
 
 /**
  * Table Definition for user_resource
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Db_Table
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class UserResource extends Gateway
 {
     /**
      * Constructor
+     *
+     * @param Adapter       $adapter Database adapter
+     * @param PluginManager $tm      Table manager
+     * @param array         $cfg     Laminas configuration
+     * @param RowGateway    $rowObj  Row prototype object (null for default)
+     * @param string        $table   Name of database table to interface with
      */
-    public function __construct()
-    {
-        parent::__construct('user_resource', 'VuFind\Db\Row\UserResource');
+    public function __construct(Adapter $adapter, PluginManager $tm, $cfg,
+        ?RowGateway $rowObj = null, $table = 'user_resource'
+    ) {
+        parent::__construct($adapter, $tm, $cfg, $rowObj, $table);
     }
 
     /**
@@ -57,10 +67,10 @@ class UserResource extends Gateway
      * @param int    $userId     Optional user ID (to limit results to a particular
      * user).
      *
-     * @return \Zend\Db\ResultSet\AbstractResultSet
+     * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
-    public function getSavedData($resourceId, $source = 'VuFind', $listId = null,
-        $userId = null
+    public function getSavedData($resourceId, $source = DEFAULT_SEARCH_BACKEND,
+        $listId = null, $userId = null
     ) {
         $callback = function ($select) use ($resourceId, $source, $listId, $userId) {
             $select->columns(
@@ -83,10 +93,10 @@ class UserResource extends Gateway
             $select->where->equalTo('r.source', $source)
                 ->equalTo('r.record_id', $resourceId);
 
-            if (!is_null($userId)) {
+            if (null !== $userId) {
                 $select->where->equalTo('user_resource.user_id', $userId);
             }
-            if (!is_null($listId)) {
+            if (null !== $listId) {
                 $select->where->equalTo('user_resource.list_id', $listId);
             }
         };
@@ -101,7 +111,7 @@ class UserResource extends Gateway
      * @param string $list_id     ID of list to link up
      * @param string $notes       Notes to associate with link
      *
-     * @return void
+     * @return \VuFind\Db\Row\UserResource
      */
     public function createOrUpdateLink($resource_id, $user_id, $list_id,
         $notes = ''
@@ -123,6 +133,7 @@ class UserResource extends Gateway
         // Update the notes:
         $result->notes = $notes;
         $result->save();
+        return $result;
     }
 
     /**
@@ -145,7 +156,7 @@ class UserResource extends Gateway
         // want to leave orphaned tags in the resource_tags table after we have
         // cleared out favorites in user_resource!
         $resourceTags = $this->getDbTable('ResourceTags');
-        $resourceTags->destroyLinks($resource_id, $user_id, $list_id);
+        $resourceTags->destroyResourceLinks($resource_id, $user_id, $list_id);
 
         // Now build the where clause to figure out which rows to remove:
         $callback = function ($select) use ($resource_id, $user_id, $list_id) {
@@ -157,7 +168,7 @@ class UserResource extends Gateway
                 $select->where->in('resource_id', $resource_id);
             }
             // null or true values of $list_id have different meanings in the
-            // context of the $resourceTags->destroyLinks() call above, since
+            // context of the $resourceTags->destroyResourceLinks() call above, since
             // some tags have a null $list_id value. In the case of user_resource
             // rows, however, every row has a non-null $list_id value, so the
             // two cases are equivalent and may be handled identically.
@@ -198,5 +209,83 @@ class UserResource extends Gateway
         $statement = $this->sql->prepareStatementForSqlObject($select);
         $result = $statement->execute();
         return (array)$result->current();
+    }
+
+    /**
+     * Get a list of duplicate rows (this sometimes happens after merging IDs,
+     * for example after a Summon resource ID changes).
+     *
+     * @return mixed
+     */
+    public function getDuplicates()
+    {
+        $callback = function ($select) {
+            $select->columns(
+                [
+                    'resource_id' => new Expression(
+                        'MIN(?)', ['resource_id'], [Expression::TYPE_IDENTIFIER]
+                    ),
+                    'list_id' => new Expression(
+                        'MIN(?)', ['list_id'], [Expression::TYPE_IDENTIFIER]
+                    ),
+                    'user_id' => new Expression(
+                        'MIN(?)', ['user_id'], [Expression::TYPE_IDENTIFIER]
+                    ),
+                    'cnt' => new Expression(
+                        'COUNT(?)', ['resource_id'], [Expression::TYPE_IDENTIFIER]
+                    ),
+                    'id' => new Expression(
+                        'MIN(?)', ['id'], [Expression::TYPE_IDENTIFIER]
+                    )
+                ]
+            );
+            $select->group(['resource_id', 'list_id', 'user_id']);
+            $select->having('COUNT(resource_id) > 1');
+        };
+        return $this->select($callback);
+    }
+
+    /**
+     * Deduplicate rows (sometimes necessary after merging foreign key IDs).
+     *
+     * @return void
+     */
+    public function deduplicate()
+    {
+        foreach ($this->getDuplicates() as $dupe) {
+            // Do this as a transaction to prevent odd behavior:
+            $connection = $this->getAdapter()->getDriver()->getConnection();
+            $connection->beginTransaction();
+
+            // Merge notes together...
+            $mainCriteria = [
+                'resource_id' => $dupe['resource_id'],
+                'list_id' => $dupe['list_id'],
+                'user_id' => $dupe['user_id'],
+            ];
+            $dupeRows = $this->select($mainCriteria);
+            $notes = [];
+            foreach ($dupeRows as $row) {
+                if (!empty($row['notes'])) {
+                    $notes[] = $row['notes'];
+                }
+            }
+            $this->update(
+                ['notes' => implode(' ', $notes)],
+                ['id' => $dupe['id']]
+            );
+            // Now delete extra rows...
+            $callback = function ($select) use ($dupe, $mainCriteria) {
+                // match on all relevant IDs in duplicate group
+                $select->where($mainCriteria);
+                // getDuplicates returns the minimum id in the set, so we want to
+                // delete all of the duplicates with a higher id value.
+                $select->where->greaterThan('id', $dupe['id']);
+            };
+            $this->delete($callback);
+
+            // Done -- commit the transaction:
+            $connection->commit();
+        }
     }
 }

@@ -2,7 +2,7 @@
 /**
  * EDS API Options
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) EBSCO Industries 2013
  *
@@ -17,24 +17,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  EBSCO
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 namespace VuFind\Search\EDS;
 
 /**
  * EDS API Options
  *
- * @category VuFind2
+ * @category VuFind
  * @package  EBSCO
  * @author   Michelle Milton <mmilton@epnet.com>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://www.vufind.org  Main Page
+ * @link     https://vufind.org Main Page
  */
 class Options extends \VuFind\Search\Base\Options
 {
@@ -47,42 +47,49 @@ class Options extends \VuFind\Search\Base\Options
 
     /**
      * Default search mode options
+     *
      * @var string
      */
     protected $defaultMode = 'all';
 
     /**
      * The set search mode
+     *
      * @var string
      */
     protected $searchMode;
 
     /**
      * Default expanders to apply
+     *
      * @var array
      */
     protected $defaultExpanders = [];
 
     /**
      * Available expander options
+     *
      * @var unknown
      */
     protected $expanderOptions = [];
 
     /**
      * Available limiter options
+     *
      * @var unknown
-    */
+     */
     protected $limiterOptions = [];
 
     /**
-     * Wheither or not to return available facets with the search response
+     * Whether or not to return available facets with the search response
+     *
      * @var unknown
      */
     protected $includeFacets = 'y';
 
     /**
      * Available Search Options from the API
+     *
      * @var array
      */
     protected $apiInfo;
@@ -100,13 +107,6 @@ class Options extends \VuFind\Search\Base\Options
      * @var array
      */
     protected $commonExpanders = [];
-
-    /**
-     * Pre-assigned filters
-     *
-     * @var array
-     */
-    protected $hiddenFilters = [];
 
     /**
      * Constructor
@@ -221,6 +221,7 @@ class Options extends \VuFind\Search\Base\Options
     {
         return $this->defaultExpanders;
     }
+
     /**
      * Return the route name of the action used for performing advanced searches.
      * Returns false if the feature is not supported.
@@ -251,9 +252,9 @@ class Options extends \VuFind\Search\Base\Options
      * at the time this method is called, so we just need to check if the
      * user-supplied values are valid, and if so, filter/reorder accordingly.
      *
-     * @param \Zend\Config\Config $searchSettings Configuration
-     * @param string              $section        Configuration section to read
-     * @param string              $property       Property of this object to read
+     * @param \Laminas\Config\Config $searchSettings Configuration
+     * @param string                 $section        Configuration section to read
+     * @param string                 $property       Property of this object to read
      * and/or modify.
      *
      * @return void
@@ -282,11 +283,11 @@ class Options extends \VuFind\Search\Base\Options
     /**
      * Apply user-requested "common" settings.
      *
-     * @param \Zend\Config\Config $searchSettings Configuration
-     * @param string              $setting        Name of common setting
-     * @param string              $list           Name of property containing valid
-     * values
-     * @param string              $target         Name of property to populate
+     * @param \Laminas\Config\Config $searchSettings Configuration
+     * @param string                 $setting        Name of common setting
+     * @param string                 $list           Name of property containing
+     * valid values
+     * @param string                 $target         Name of property to populate
      *
      * @return void
      */
@@ -296,7 +297,7 @@ class Options extends \VuFind\Search\Base\Options
             $userValues = explode(',', $searchSettings->General->$setting);
 
             if (!empty($userValues) && isset($this->$list) && !empty($this->$list)) {
-                // Reference to property containing API-provided whitelist of values
+                // Reference to property containing API-provided list of legal values
                 $listRef = & $this->$list;
                 // Reference to property containing final common settings
                 $targetRef = & $this->$target;
@@ -315,7 +316,7 @@ class Options extends \VuFind\Search\Base\Options
      * from the values in the Info method. (If the values set in the config files in
      * not a 'valid' EDS API value, it will be ignored.
      *
-     * @param \Zend\Config\Config $searchSettings Configuration
+     * @param \Laminas\Config\Config $searchSettings Configuration
      *
      * @return void
      */
@@ -379,6 +380,11 @@ class Options extends \VuFind\Search\Base\Options
             $this->defaultView = 'list|' . $searchSettings->General->default_view;
         }
 
+        // Load list view for result (controls AJAX embedding vs. linking)
+        if (isset($searchSettings->List->view)) {
+            $this->listviewOption = $searchSettings->List->view;
+        }
+
         if (isset($searchSettings->Advanced_Facet_Settings->special_facets)) {
             $this->specialAdvancedFacets
                 = $searchSettings->Advanced_Facet_Settings->special_facets;
@@ -392,6 +398,9 @@ class Options extends \VuFind\Search\Base\Options
         $this->setCommonSettings(
             $searchSettings, 'common_expanders', 'expanderOptions', 'commonExpanders'
         );
+
+        // Load autocomplete preferences:
+        $this->configureAutocomplete($searchSettings);
     }
 
     /**
@@ -454,7 +463,7 @@ class Options extends \VuFind\Search\Base\Options
                         'Label' => $mode['Label'], 'Value' => $mode['Mode']
                     ];
                     if (isset($mode['DefaultOn'])
-                        &&  'y' == $mode['DefaultOn']
+                        && 'y' == $mode['DefaultOn']
                     ) {
                         $this->defaultMode = $mode['Mode'];
                     }
@@ -472,7 +481,7 @@ class Options extends \VuFind\Search\Base\Options
                     if (isset($expander['DefaultOn'])
                         && 'y' == $expander['DefaultOn']
                     ) {
-                        $this->defaultExpanders[] =  $expander['Id'];
+                        $this->defaultExpanders[] = $expander['Id'];
                     }
                 }
             }
@@ -494,12 +503,9 @@ class Options extends \VuFind\Search\Base\Options
                                 $limiter['LimiterValues']
                             )
                             : [['Value' => $val]],
-                        'DefaultOn' => isset($limiter['DefaultOn'])
-                            ? $limiter['DefaultOn'] : 'n',
+                        'DefaultOn' => $limiter['DefaultOn'] ?? 'n',
                     ];
-
                 }
-
             }
         }
     }
@@ -647,28 +653,6 @@ class Options extends \VuFind\Search\Base\Options
     {
         $viewArr = explode('|', $this->defaultView);
         return $viewArr[0];
-    }
-
-    /**
-     * Add a hidden (i.e. not visible in facet controls) filter query to the object.
-     *
-     * @param string $fq Filter query for Solr.
-     *
-     * @return void
-     */
-    public function addHiddenFilter($fq)
-    {
-        $this->hiddenFilters[] = $fq;
-    }
-
-    /**
-     * Get an array of hidden filters.
-     *
-     * @return array
-     */
-    public function getHiddenFilters()
-    {
-        return $this->hiddenFilters;
     }
 
     /**

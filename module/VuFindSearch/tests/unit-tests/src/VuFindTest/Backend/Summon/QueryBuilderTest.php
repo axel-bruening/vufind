@@ -3,7 +3,7 @@
 /**
  * Unit tests for Summon query builder
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -18,29 +18,29 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\Summon;
 
+use PHPUnit\Framework\TestCase;
 use VuFindSearch\Backend\Summon\QueryBuilder;
-use PHPUnit_Framework_TestCase;
 
 /**
  * Unit tests for Summon query builder
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class QueryBuilderTest extends PHPUnit_Framework_TestCase
+class QueryBuilderTest extends TestCase
 {
     /**
      * Test query parsing.

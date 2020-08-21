@@ -3,7 +3,7 @@
 /**
  * Unit tests for Primo Permission Handler.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2015.
  *
@@ -18,30 +18,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFindTest\Search\Primo;
 
+use LmcRbacMvc\Service\AuthorizationService;
 use VuFind\Search\Primo\PrimoPermissionHandler;
 use VuFindTest\Unit\TestCase;
-
-use ZfcRbac\Service\AuthorizationServiceAwareInterface,
-    ZfcRbac\Service\AuthorizationServiceAwareTrait;
 
 /**
  * Unit tests for Primo Permission Handler.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   Oliver Goldschmidt <o.goldschmidt@tuhh.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class PrimoPermissionHandlerTest extends TestCase
 {
@@ -132,7 +130,7 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    protected function setup()
+    protected function setUp(): void
     {
     }
 
@@ -141,12 +139,12 @@ class PrimoPermissionHandlerTest extends TestCase
      * This should throw an Exception.
      *
      * @return void
-     *
-     * @expectedException Exception
-     * @expectedExceptionMessage No institutionCode found.
      */
     public function testWithoutConfig()
     {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('No institutionCode found.');
+
         new PrimoPermissionHandler(null);
     }
 
@@ -168,10 +166,10 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function testWithoutAuthorizationServiceWithZendConfigObject()
+    public function testWithoutAuthorizationServiceWithLaminasConfigObject()
     {
         $handler = new PrimoPermissionHandler(
-            new \Zend\Config\Config($this->primoConfig)
+            new \Laminas\Config\Config($this->primoConfig)
         );
         $this->assertEquals(false, $handler->hasPermission());
     }
@@ -185,7 +183,7 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerCodeSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
@@ -206,16 +204,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultCode()
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('DEFAULT', $handler->getInstCode());
@@ -241,16 +245,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerMemberAuthSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberAuthSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberAuthSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(true, $handler->hasPermission());
@@ -264,16 +274,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerMemberAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
@@ -287,16 +303,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultAuthSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(true, $handler->hasPermission());
@@ -310,16 +332,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
@@ -334,7 +362,7 @@ class PrimoPermissionHandlerTest extends TestCase
     {
         $handler = new PrimoPermissionHandler($this->primoConfig);
         $handler->setInstCode('NOTEXISTING');
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
@@ -345,7 +373,9 @@ class PrimoPermissionHandlerTest extends TestCase
         $this->assertEquals(false, $handler->hasPermission());
     }
 
-    /***************** Tests with configuration without default ************/
+    /*****************
+     * Tests with configuration without default
+     ************/
 
     /**
      * Test the handler if permission matches
@@ -355,16 +385,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerWithoutDefaultAuthSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigWithoutDefault);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberAuthSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberAuthSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(true, $handler->hasPermission());
@@ -378,16 +414,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerWithoutDefaultAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigWithoutDefault);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
@@ -401,7 +443,7 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerWithoutDefaultCodeSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigWithoutDefault);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
@@ -422,7 +464,7 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerWithoutDefaultCodeAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigWithoutDefault);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
@@ -441,16 +483,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerWithoutDefaultDefaultAuthSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigWithoutDefault);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
@@ -464,22 +512,30 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerWithoutDefaultDefaultAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigWithoutDefault);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
     }
 
-    /***************** Tests with configuration with default and onCampusRule for default ************/
+    /*****************
+     * Tests with configuration with default and onCampusRule for default
+     ************/
 
     /**
      * Test the handler if permission (member and deafult) does not match
@@ -489,16 +545,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultOnlyAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigDefaultOnly);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
@@ -514,16 +576,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultOnlyCodeAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigDefaultOnly);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('DEFAULT', $handler->getInstCode());
@@ -537,16 +605,22 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultOnlyDefaultAuthSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigDefaultOnly);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(true, $handler->hasPermission());
@@ -560,22 +634,30 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultOnlyDefaultAuthNotSuccessfull()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigDefaultOnly);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.MEMBER'),
-                $this->equalTo('primo.defaultRule')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerDefaultAuthNotSuccessfullCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.MEMBER'),
+                    $this->equalTo('primo.defaultRule')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerDefaultAuthNotSuccessfullCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->hasPermission());
     }
 
-    /***************** Tests with configuration with one member and onCampusRule ************/
+    /*****************
+     * Tests with configuration with one member and onCampusRule
+     ************/
 
     /**
      * Test the handler if permission (member and default) does not match
@@ -585,17 +667,23 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerMemberIsOnCampusWithDefault()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigInstitutionCode);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.defaultRule'),
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberIsOnCampusCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.defaultRule'),
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberIsOnCampusCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('MEMBER', $handler->getInstCode());
@@ -612,17 +700,23 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerMemberIsNotOnCampusWithDefault()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigInstitutionCode);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.defaultRule'),
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberIsNotOnCampusCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.defaultRule'),
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberIsNotOnCampusCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('MEMBER', $handler->getInstCode());
@@ -637,17 +731,23 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerIsNotAMemberAndNotDefaultOnCampus()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigInstitutionCode);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.defaultRule'),
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerIsNotAMemberCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.defaultRule'),
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerIsNotAMemberCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('DEFAULT', $handler->getInstCode());
@@ -662,24 +762,32 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerIsNotAMemberButOnDefaultCampus()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigInstitutionCode);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.defaultRule'),
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerIsOnDefaultCampusCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.defaultRule'),
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerIsOnDefaultCampusCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('DEFAULT', $handler->getInstCode());
         $this->assertEquals(true, $handler->hasPermission());
     }
 
-    /***************** Tests with configuration with one member and onCampusRule ************/
+    /*****************
+     * Tests with configuration with one member and onCampusRule
+     ************/
 
     /**
      * Test the handler if permission (member and deafult) does not match
@@ -691,16 +799,22 @@ class PrimoPermissionHandlerTest extends TestCase
         $handler = new PrimoPermissionHandler(
             $this->primoConfigWithoutDefaultWithInstCode
         );
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberIsOnCampusCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberIsOnCampusCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('MEMBER', $handler->getInstCode());
@@ -719,16 +833,22 @@ class PrimoPermissionHandlerTest extends TestCase
         $handler = new PrimoPermissionHandler(
             $this->primoConfigWithoutDefaultWithInstCode
         );
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerMemberIsNotOnCampusCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerMemberIsNotOnCampusCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals('MEMBER', $handler->getInstCode());
@@ -745,23 +865,31 @@ class PrimoPermissionHandlerTest extends TestCase
         $handler = new PrimoPermissionHandler(
             $this->primoConfigWithoutDefaultWithInstCode
         );
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
-            ->with($this->logicalOr(
-                $this->equalTo('primo.isAtMEMBER'),
-                $this->equalTo('primo.isOnCampusAtMEMBER')
-            ))
-            ->will($this->returnCallback([$this,
-                'handlerIsNotAMemberCallback']));
+            ->with(
+                $this->logicalOr(
+                    $this->equalTo('primo.isAtMEMBER'),
+                    $this->equalTo('primo.isOnCampusAtMEMBER')
+                )
+            )
+            ->will(
+                $this->returnCallback(
+                    [$this,
+                    'handlerIsNotAMemberCallback']
+                )
+            );
         $handler->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $handler->getInstCode());
         $this->assertEquals(false, $handler->hasPermission());
     }
 
-    /***************** Tests with configuration with default only (no default onCampusRule) ************/
+    /*****************
+     * Tests with configuration with default only (no default onCampusRule)
+     ************/
 
     /**
      * Permission cannot be granted without an onCampusRule
@@ -771,7 +899,7 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultOnlyNoOncampus()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigDefaultOnlyNoOnCampusRule);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
@@ -791,7 +919,7 @@ class PrimoPermissionHandlerTest extends TestCase
     public function testHandlerDefaultOnlyCodeNoOncampus()
     {
         $handler = new PrimoPermissionHandler($this->primoConfigDefaultOnlyNoOnCampusRule);
-        $mockAuth = $this->getMockBuilder('ZfcRbac\Service\AuthorizationService')
+        $mockAuth = $this->getMockBuilder(AuthorizationService::class)
             ->disableOriginalConstructor()
             ->getMock();
         $mockAuth->expects($this->any())->method('isGranted')
@@ -801,7 +929,9 @@ class PrimoPermissionHandlerTest extends TestCase
         $this->assertEquals('DEFAULT', $handler->getInstCode());
     }
 
-    /*****************    Callback helper functions    ************/
+    /*****************
+     * Callback helper functions
+     ************/
 
     /**
      * Helper function (Callback) to inject different return values
@@ -809,7 +939,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerMemberAuthNotSuccessfullCallback($param) {
+    public function handlerMemberAuthNotSuccessfullCallback($param)
+    {
         if ($param == 'primo.MEMBER') {
             return false;
         }
@@ -822,7 +953,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerMemberAuthSuccessfullCallback($param) {
+    public function handlerMemberAuthSuccessfullCallback($param)
+    {
         if ($param == 'primo.MEMBER') {
             return true;
         }
@@ -835,7 +967,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerDefaultAuthSuccessfullCallback($param) {
+    public function handlerDefaultAuthSuccessfullCallback($param)
+    {
         if ($param == 'primo.defaultRule') {
             return true;
         }
@@ -848,7 +981,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerDefaultAuthNotSuccessfullCallback($param) {
+    public function handlerDefaultAuthNotSuccessfullCallback($param)
+    {
         if ($param == 'primo.defaultRule') {
             return false;
         }
@@ -861,7 +995,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerMemberIsOnCampusCallback($param) {
+    public function handlerMemberIsOnCampusCallback($param)
+    {
         if ($param == 'primo.defaultRule') {
             return false;
         }
@@ -880,7 +1015,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerMemberIsNotOnCampusCallback($param) {
+    public function handlerMemberIsNotOnCampusCallback($param)
+    {
         if ($param == 'primo.defaultRule') {
             return false;
         }
@@ -899,7 +1035,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerIsNotAMemberCallback($param) {
+    public function handlerIsNotAMemberCallback($param)
+    {
         if ($param == 'primo.defaultRule') {
             return false;
         }
@@ -915,7 +1052,8 @@ class PrimoPermissionHandlerTest extends TestCase
      *
      * @return void
      */
-    public function handlerIsOnDefaultCampusCallback($param) {
+    public function handlerIsOnDefaultCampusCallback($param)
+    {
         if ($param == 'primo.defaultRule') {
             return true;
         }

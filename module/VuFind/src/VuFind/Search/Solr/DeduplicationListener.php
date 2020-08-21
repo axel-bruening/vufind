@@ -3,7 +3,7 @@
 /**
  * Solr deduplication (merged records) listener.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  * Copyright (C) The National Library of Finland 2013.
@@ -19,32 +19,32 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\Solr;
 
-use VuFindSearch\Backend\BackendInterface;
+use Laminas\EventManager\EventInterface;
 
-use Zend\EventManager\SharedEventManagerInterface;
-use Zend\EventManager\EventInterface;
-use Zend\ServiceManager\ServiceLocatorInterface;
+use Laminas\EventManager\SharedEventManagerInterface;
+use Laminas\ServiceManager\ServiceLocatorInterface;
+use VuFindSearch\Backend\BackendInterface;
 
 /**
  * Solr merged record handling listener.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @author   Ere Maijala <ere.maijala@helsinki.fi>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org   Main Site
+ * @link     https://vufind.org Main Site
  */
 class DeduplicationListener
 {
@@ -134,10 +134,10 @@ class DeduplicationListener
         if ($backend === $this->backend) {
             $params = $event->getParam('params');
             $context = $event->getParam('context');
-            if (($context == 'search' || $context == 'similar') && $params) {
+            if ($params && in_array($context, ['search', 'similar', 'getids'])) {
                 // If deduplication is enabled, filter out merged child records,
                 // otherwise filter out dedup records.
-                if ($this->enabled) {
+                if ($this->enabled && 'getids' !== $context) {
                     $fq = '-merged_child_boolean:true';
                     if ($context == 'similar' && $id = $event->getParam('id')) {
                         $fq .= ' AND -local_ids_str_mv:"'
@@ -183,12 +183,12 @@ class DeduplicationListener
      */
     protected function fetchLocalRecords($event)
     {
-        $config = $this->serviceLocator->get('VuFind\Config');
+        $config = $this->serviceLocator->get(\VuFind\Config\PluginManager::class);
         $searchConfig = $config->get($this->searchConfig);
         $dataSourceConfig = $config->get($this->dataSourceConfig);
-        $recordSources = isset($searchConfig->Records->sources)
-            ? $searchConfig->Records->sources
-            : '';
+        $recordSources = !empty($searchConfig->Records->sources)
+            ? explode(',', $searchConfig->Records->sources)
+            : [];
         $sourcePriority = $this->determineSourcePriority($recordSources);
         $params = $event->getParam('params');
         $buildingPriority = $this->determineBuildingPriority($params);
@@ -211,6 +211,10 @@ class DeduplicationListener
             foreach ($localIds as $localId) {
                 $localPriority = null;
                 list($source) = explode('.', $localId, 2);
+                // Ignore ID if source is not in the list of allowed record sources:
+                if ($recordSources && !in_array($source, $recordSources)) {
+                    continue;
+                }
                 if (!empty($buildingPriority)) {
                     if (isset($buildingPriority[$source])) {
                         $localPriority = -$buildingPriority[$source];
@@ -234,7 +238,7 @@ class DeduplicationListener
                 }
                 $dedupData[$source] = [
                     'id' => $localId,
-                    'priority' => isset($localPriority) ? $localPriority : 99999
+                    'priority' => $localPriority ?? 99999
                 ];
             }
             $fields['dedup_id'] = $dedupId;
@@ -300,10 +304,10 @@ class DeduplicationListener
      * two parameters are unused in this default method, but they may be useful for
      * custom behavior in subclasses.
      *
-     * @param array  $localRecordData Local record data
-     * @param array  $dedupRecordData Dedup record data
-     * @param string $recordSources   List of active record sources, empty if all
-     * @param array  $sourcePriority  Array of source priorities keyed by source id
+     * @param array $localRecordData Local record data
+     * @param array $dedupRecordData Dedup record data
+     * @param array $recordSources   List of active record sources, empty if all
+     * @param array $sourcePriority  Array of source priorities keyed by source id
      *
      * @return array Local record data
      *
@@ -319,13 +323,16 @@ class DeduplicationListener
     /**
      * Function that determines the priority for sources
      *
-     * @param object $recordSources Record sources defined in searches.ini
+     * @param array $recordSources Record sources defined in searches.ini
      *
      * @return array Array keyed by source with priority as the value
      */
     protected function determineSourcePriority($recordSources)
     {
-        return array_flip(explode(',', $recordSources));
+        if (empty($recordSources)) {
+            return [];
+        }
+        return array_flip($recordSources);
     }
 
     /**
@@ -339,24 +346,20 @@ class DeduplicationListener
     {
         $result = [];
         foreach ($params->get('fq') as $fq) {
-            if (preg_match(
-                '/\bbuilding:"([^"]+)"/', //'/\bbuilding:"?\d+\/([^\/]+?)\//',
-                $fq,
-                $matches
-            )) {
-                $value = $matches[1];
-                if (preg_match('/^\d+\/([^\/]+?)\//', $value, $matches)) {
-                    // Hierarchical facets; take only first level:
-                    $result[] = $matches[1];
-                } else {
-                    $result[] = $value;
+            if (preg_match_all('/\bbuilding:"([^"]+)"/', $fq, $matches)) {
+                $values = $matches[1];
+                foreach ($values as $value) {
+                    if (preg_match('/^\d+\/([^\/]+?)\//', $value, $matches)) {
+                        // Hierarchical facets; take only first level:
+                        $result[] = $matches[1];
+                    } else {
+                        $result[] = $value;
+                    }
                 }
             }
         }
 
         array_unshift($result, '');
-        $result = array_flip($result);
-        return $result;
+        return array_flip($result);
     }
-
 }

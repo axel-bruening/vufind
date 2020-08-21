@@ -3,7 +3,7 @@
 /**
  * Search service.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,33 +18,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch;
 
+use Laminas\EventManager\EventManager;
+use Laminas\EventManager\EventManagerInterface;
 use VuFindSearch\Backend\BackendInterface;
-use VuFindSearch\Feature\RetrieveBatchInterface;
-use VuFindSearch\Feature\RandomInterface;
 use VuFindSearch\Backend\Exception\BackendException;
-use VuFindSearch\Response\RecordCollectionInterface;
+use VuFindSearch\Feature\GetIdsInterface;
+use VuFindSearch\Feature\RandomInterface;
 
-use Zend\EventManager\EventManagerInterface;
-use Zend\EventManager\EventManager;
+use VuFindSearch\Feature\RetrieveBatchInterface;
+use VuFindSearch\Response\RecordCollectionInterface;
 
 /**
  * Search service.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class Service
 {
@@ -75,10 +76,15 @@ class Service
     /**
      * Constructor.
      *
+     * @param EventManagerInterface $events Event manager (optional)
+     *
      * @return void
      */
-    public function __construct()
+    public function __construct(EventManagerInterface $events = null)
     {
+        if (null !== $events) {
+            $this->setEventManager($events);
+        }
         $this->backends = [];
     }
 
@@ -87,8 +93,8 @@ class Service
      *
      * @param string              $backend Search backend identifier
      * @param Query\AbstractQuery $query   Search query
-     * @param integer             $offset  Search offset
-     * @param integer             $limit   Search limit
+     * @param int                 $offset  Search offset
+     * @param int                 $limit   Search limit
      * @param ParamBag            $params  Search backend parameters
      *
      * @return RecordCollectionInterface
@@ -96,8 +102,8 @@ class Service
     public function search($backend, Query\AbstractQuery $query, $offset = 0,
         $limit = 20, ParamBag $params = null
     ) {
-        $params  = $params ?: new ParamBag();
         $context = __FUNCTION__;
+        $params  = $params ?: new ParamBag();
         $args = compact('backend', 'query', 'offset', 'limit', 'params', 'context');
         $backend  = $this->resolve($backend, $args);
         $args['backend_instance'] = $backend;
@@ -105,6 +111,42 @@ class Service
         $this->triggerPre($backend, $args);
         try {
             $response = $backend->search($query, $offset, $limit, $params);
+        } catch (BackendException $e) {
+            $this->triggerError($e, $args);
+            throw $e;
+        }
+        $this->triggerPost($response, $args);
+        return $response;
+    }
+
+    /**
+     * Perform a search that returns record IDs and return a wrapped response.
+     *
+     * @param string              $backend Search backend identifier
+     * @param Query\AbstractQuery $query   Search query
+     * @param int                 $offset  Search offset
+     * @param int                 $limit   Search limit
+     * @param ParamBag            $params  Search backend parameters
+     *
+     * @return RecordCollectionInterface
+     */
+    public function getIds($backend, Query\AbstractQuery $query, $offset = 0,
+        $limit = 20, ParamBag $params = null
+    ) {
+        $context = strtolower(__FUNCTION__);
+
+        $params  = $params ?: new ParamBag();
+        $args = compact('backend', 'query', 'offset', 'limit', 'params', 'context');
+        $backend  = $this->resolve($backend, $args);
+        $args['backend_instance'] = $backend;
+
+        $this->triggerPre($backend, $args);
+        try {
+            if ($backend instanceof GetIdsInterface) {
+                $response = $backend->getIds($query, $offset, $limit, $params);
+            } else {
+                $response = $backend->search($query, $offset, $limit, $params);
+            }
         } catch (BackendException $e) {
             $this->triggerError($e, $args);
             throw $e;
@@ -181,7 +223,7 @@ class Service
                 }
                 if (!$response) {
                     $response = $next;
-                } else if ($record = $next->first()) {
+                } elseif ($record = $next->first()) {
                     $response->add($record);
                 }
             }
@@ -196,7 +238,7 @@ class Service
      *
      * @param string              $backend Search backend identifier
      * @param Query\AbstractQuery $query   Search query
-     * @param integer             $limit   Search limit
+     * @param int                 $limit   Search limit
      * @param ParamBag            $params  Search backend parameters
      *
      * @return RecordCollectionInterface
@@ -237,7 +279,7 @@ class Service
             } elseif ($total_records < $limit) {
                 // Result set smaller than limit? Get everything and shuffle:
                 try {
-                     $response = $backend->search($query, 0, $limit, $params);
+                    $response = $backend->search($query, 0, $limit, $params);
                 } catch (BackendException $e) {
                     $this->triggerError($e, $args);
                     throw $e;
@@ -264,7 +306,7 @@ class Service
                     }
                     if (!$response) {
                         $response = $currentBatch;
-                    } else if ($record = $currentBatch->first()) {
+                    } elseif ($record = $currentBatch->first()) {
                         $response->add($record);
                     }
                 }
@@ -349,13 +391,13 @@ class Service
     protected function resolve($backend, $args)
     {
         if (!isset($this->backends[$backend])) {
-            $response = $this->getEventManager()->trigger(
+            $response = $this->getEventManager()->triggerUntil(
+                function ($o) {
+                    return $o instanceof BackendInterface;
+                },
                 self::EVENT_RESOLVE,
                 $this,
-                $args,
-                function ($o) {
-                    return ($o instanceof BackendInterface);
-                }
+                $args
             );
             if (!$response->stopped()) {
                 throw new Exception\RuntimeException(
@@ -408,5 +450,4 @@ class Service
     {
         $this->getEventManager()->trigger(self::EVENT_POST, $response, $args);
     }
-
 }

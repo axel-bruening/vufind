@@ -3,7 +3,7 @@
 /**
  * Unit tests for spellcheck information.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,27 +18,27 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\Solr\Json\Response;
 
+use PHPUnit\Framework\TestCase;
 use VuFindSearch\Backend\Solr\Response\Json\Spellcheck;
-use PHPUnit_Framework_TestCase as TestCase;
 
 /**
  * Unit tests for spellcheck information.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class SpellcheckTest extends TestCase
 {
@@ -53,7 +53,8 @@ class SpellcheckTest extends TestCase
             [
                 ['this is a phrase', []],
                 ['foo', []],
-                ['foobar', []]
+                ['foobar', []],
+                ['1842', []],   // test numeric handling (can cause problems)
             ],
             'fake query'
         );
@@ -61,13 +62,27 @@ class SpellcheckTest extends TestCase
             [
                 ['is a', []],
                 ['bar', []],
-                ['foo bar', []]
+                ['foo bar', []],
+                ['1842', []],
+                ['1843', []]
             ],
             'fake query'
         );
         $s1->mergeWith($s2);
-        $this->assertCount(5, $s1);
+        $this->assertCount(7, $s1);
         $this->assertEquals($s2, $s1->getSecondary());
+        $this->assertEquals(
+            [
+                'this is a phrase' => [],
+                'foobar' => [],
+                'foo' => [],
+                'bar' => [],
+                'foo bar' => [],
+                '1842' => [],
+                '1843' => [],
+            ],
+            iterator_to_array($s1->getIterator())
+        );
     }
 
     /**

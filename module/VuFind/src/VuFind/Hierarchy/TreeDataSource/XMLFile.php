@@ -2,7 +2,7 @@
 /**
  * Hierarchy Tree Data Source (XML File)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_DataSource
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 namespace VuFind\Hierarchy\TreeDataSource;
 
@@ -32,11 +32,11 @@ namespace VuFind\Hierarchy\TreeDataSource;
  *
  * This is a base helper class for producing hierarchy Trees.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_DataSource
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 class XMLFile extends AbstractBase
 {
@@ -56,8 +56,7 @@ class XMLFile extends AbstractBase
     {
         if (null === $this->basePath) {
             $settings = $this->getHierarchyDriver()->getTreeSettings();
-            $this->basePath = isset($settings['XMLFileDir'])
-                ? $settings['XMLFileDir'] : '';
+            $this->basePath = $settings['XMLFileDir'] ?? '';
         }
         return $this->basePath;
     }

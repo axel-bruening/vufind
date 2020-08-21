@@ -2,7 +2,7 @@
 /**
  * Central class for connecting to Pazpar2 resources used by VuFind.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -17,31 +17,32 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Connection
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/system_classes Wiki
+ * @link     https://vufind.org/wiki/development:architecture Wiki
  */
 namespace VuFindSearch\Backend\Pazpar2;
 
-use VuFindSearch\ParamBag;
+use Laminas\Http\Client;
+use Laminas\Http\Request;
 use VuFindSearch\Backend\Exception\HttpErrorException;
 
-use Zend\Http\Request;
+use VuFindSearch\ParamBag;
 
 /**
  * Central class for connecting to resources used by VuFind.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Connection
  * @author   Chris Hallberg <challber@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/system_classes Wiki
+ * @link     https://vufind.org/wiki/development:architecture Wiki
  */
-class Connector implements \Zend\Log\LoggerAwareInterface
+class Connector implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
@@ -55,7 +56,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * The HTTP_Request object used for REST transactions
      *
-     * @var \Zend\Http\Client
+     * @var Client
      */
     protected $client;
 
@@ -69,12 +70,11 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * Constructor
      *
-     * @param string            $base     Base URL for Pazpar2
-     * @param \Zend\Http\Client $client   An HTTP client object
-     * @param bool              $autoInit Should we auto-initialize the Pazpar2
-     * connection?
+     * @param string $base     Base URL for Pazpar2
+     * @param Client $client   An HTTP client object
+     * @param bool   $autoInit Should we auto-initialize the Pazpar2 connection?
      */
-    public function __construct($base, \Zend\Http\Client $client, $autoInit = false)
+    public function __construct($base, Client $client, $autoInit = false)
     {
         $this->base = $base;
         if (empty($this->base)) {
@@ -122,7 +122,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
         }
 
         // Don't change input when manipulating parameters:
-        $params = (null === $data) ? new ParamBag() : clone($data);
+        $params = (null === $data) ? new ParamBag() : clone $data;
 
         // Add session and command:
         if ($this->session) {
@@ -147,7 +147,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
     /**
      * Send a request and return the response.
      *
-     * @param \Zend\Http\Client $client Prepare HTTP client
+     * @param Client $client Prepare HTTP client
      *
      * @return string Response body
      *
@@ -156,7 +156,7 @@ class Connector implements \Zend\Log\LoggerAwareInterface
      * @throws \VuFindSearch\Backend\Exception\RequestErrorException Server
      * signaled a client error (HTTP 4xx)
      */
-    protected function send(\Zend\Http\Client $client)
+    protected function send(Client $client)
     {
         $this->debug(
             sprintf('=> %s %s', $client->getMethod(), $client->getUri())

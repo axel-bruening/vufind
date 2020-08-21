@@ -2,7 +2,7 @@
 /**
  * Pazpar2 backend.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,33 +17,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindSearch\Backend\Pazpar2;
 
-use VuFindSearch\Query\AbstractQuery;
+use VuFindSearch\Backend\AbstractBackend;
 
 use VuFindSearch\ParamBag;
 
-use VuFindSearch\Response\RecordCollectionInterface;
+use VuFindSearch\Query\AbstractQuery;
 use VuFindSearch\Response\RecordCollectionFactoryInterface;
 
-use VuFindSearch\Backend\AbstractBackend;
+use VuFindSearch\Response\RecordCollectionInterface;
 
 /**
  * Pazpar2 backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 class Backend extends AbstractBackend
 {
@@ -123,8 +123,8 @@ class Backend extends AbstractBackend
      * Perform a search and return record collection.
      *
      * @param AbstractQuery $query  Search query
-     * @param integer       $offset Search offset
-     * @param integer       $limit  Search limit
+     * @param int           $offset Search offset
+     * @param int           $limit  Search limit
      * @param ParamBag      $params Search backend parameters
      *
      * @return RecordCollectionInterface
@@ -139,7 +139,7 @@ class Backend extends AbstractBackend
         $this->connector->search($baseParams);
 
         /* Pazpar2 does not return all results immediately. Rather, we need to
-         * occassionally check with the Pazpar2 server on the status of the
+         * occasionally check with the Pazpar2 server on the status of the
          * search.
          *
          * This loop will continue to wait until the configured level of
@@ -160,7 +160,7 @@ class Backend extends AbstractBackend
         );
         $response = $this->connector->show($showParams);
 
-        $hits = isset($response->hit) ? $response->hit : [];
+        $hits = $response->hit ?? [];
         $collection = $this->createRecordCollection(
             $hits, intval($response->merged), $offset
         );
@@ -263,6 +263,6 @@ class Backend extends AbstractBackend
     protected function getSearchProgress()
     {
         $statResponse = $this->connector->stat();
-        return (float) $statResponse->progress;
+        return (float)$statResponse->progress;
     }
 }

@@ -3,7 +3,7 @@
 /**
  * Unit tests for WorldCat connector.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -18,13 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
 namespace VuFindTest\Backend\WorldCat;
 
@@ -34,13 +34,13 @@ use VuFindSearch\ParamBag;
 /**
  * Unit tests for WorldCat backend.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  Search
  * @author   David Maus <maus@hab.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org
+ * @link     https://vufind.org
  */
-class ConnectorTest extends \PHPUnit_Framework_TestCase
+class ConnectorTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Test "get holdings"
@@ -49,15 +49,15 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetHoldings()
     {
-        $client = $this->getMock('Zend\Http\Client');
+        $client = $this->createMock(\Laminas\Http\Client::class);
         $connector = new Connector('key', $client);
         $client->expects($this->once())->method('setMethod')
             ->with($this->equalTo('POST'))
             ->will($this->returnValue($client));
         $client->expects($this->once())->method('setUri')
-            ->with($this->equalTo('http://www.worldcat.org/webservices/catalog/content/libraries/baz?wskey=key&servicelevel=full'));
+            ->with($this->equalTo('http://www.worldcat.org/webservices/catalog/content/libraries/baz?wskey=key&servicelevel=full&frbrGrouping=on'));
         $body = '<foo>bar</foo>';
-        $response = $this->getMock('Zend\Http\Response');
+        $response = $this->createMock(\Laminas\Http\Response::class);
         $response->expects($this->once())->method('getBody')
             ->will($this->returnValue($body));
         $response->expects($this->any())->method('isSuccess')
@@ -72,17 +72,17 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
      * Test "get holdings" HTTP failure
      *
      * @return void
-     *
-     * @expectedException VuFindSearch\Backend\Exception\RequestErrorException
      */
     public function testGetHoldingsHttpFailure()
     {
-        $client = $this->getMock('Zend\Http\Client');
+        $this->expectException(\VuFindSearch\Backend\Exception\RequestErrorException::class);
+
+        $client = $this->createMock(\Laminas\Http\Client::class);
         $connector = new Connector('key', $client);
         $client->expects($this->once())->method('setMethod')
             ->with($this->equalTo('POST'))
             ->will($this->returnValue($client));
-        $response = $this->getMock('Zend\Http\Response');
+        $response = $this->createMock(\Laminas\Http\Response::class);
         $response->expects($this->any())->method('isSuccess')
             ->will($this->returnValue(false));
         $client->expects($this->once())->method('send')
@@ -97,7 +97,7 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetRecord()
     {
-        $client = $this->getMock('Zend\Http\Client');
+        $client = $this->createMock(\Laminas\Http\Client::class);
         $connector = new Connector('key', $client);
         $client->expects($this->once())->method('setMethod')
             ->with($this->equalTo('POST'))
@@ -105,7 +105,7 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
         $client->expects($this->once())->method('setUri')
             ->with($this->equalTo('http://www.worldcat.org/webservices/catalog/content/baz?servicelevel=full&wskey=key'));
         $body = '<foo>bar</foo>';
-        $response = $this->getMock('Zend\Http\Response');
+        $response = $this->createMock(\Laminas\Http\Response::class);
         $response->expects($this->once())->method('getBody')
             ->will($this->returnValue($body));
         $response->expects($this->any())->method('isSuccess')
@@ -123,7 +123,7 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetRecordWithError()
     {
-        $client = $this->getMock('Zend\Http\Client');
+        $client = $this->createMock(\Laminas\Http\Client::class);
         $connector = new Connector('key', $client);
         $client->expects($this->once())->method('setMethod')
             ->with($this->equalTo('POST'))
@@ -131,7 +131,7 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
         $client->expects($this->once())->method('setUri')
             ->with($this->equalTo('http://www.worldcat.org/webservices/catalog/content/baz?servicelevel=full&wskey=key'));
         $body = '<foo><diagnostic>bad</diagnostic></foo>';
-        $response = $this->getMock('Zend\Http\Response');
+        $response = $this->createMock(\Laminas\Http\Response::class);
         $response->expects($this->once())->method('getBody')
             ->will($this->returnValue($body));
         $response->expects($this->any())->method('isSuccess')
@@ -149,7 +149,7 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
      */
     public function testSearch()
     {
-        $client = $this->getMock('Zend\Http\Client');
+        $client = $this->createMock(\Laminas\Http\Client::class);
         $connector = new Connector('key', $client);
         $client->expects($this->once())->method('setMethod')
             ->with($this->equalTo('POST'))
@@ -157,7 +157,7 @@ class ConnectorTest extends \PHPUnit_Framework_TestCase
         $client->expects($this->once())->method('setUri')
             ->with($this->equalTo('http://www.worldcat.org/webservices/catalog/search/sru?version=1.1&x=y&startRecord=0&maximumRecords=20&servicelevel=full&wskey=key'));
         $body = '<foo>,<numberOfRecords>1</numberOfRecords><records><record><recordData>bar</recordData></record></records></foo>';
-        $response = $this->getMock('Zend\Http\Response');
+        $response = $this->createMock(\Laminas\Http\Response::class);
         $response->expects($this->once())->method('getBody')
             ->will($this->returnValue($body));
         $response->expects($this->any())->method('isSuccess')

@@ -2,7 +2,7 @@
 /**
  * "Results as feed" view helper
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,29 +17,31 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\View\Helper\Root;
-use DateTime,
-    VuFind\I18n\Translator\TranslatorAwareInterface,
-    Zend\Feed\Writer\Writer as FeedWriter,
-    Zend\Feed\Writer\Feed,
-    Zend\View\Helper\AbstractHelper;
+
+use DateTime;
+use Laminas\Feed\Writer\Feed;
+use Laminas\Feed\Writer\Writer as FeedWriter;
+use Laminas\ServiceManager\ServiceManager;
+use Laminas\View\Helper\AbstractHelper;
+use VuFind\I18n\Translator\TranslatorAwareInterface;
 
 /**
  * "Results as feed" view helper
  *
- * @category VuFind2
+ * @category VuFind
  * @package  View_Helpers
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:developer_manual Wiki
+ * @link     https://vufind.org/wiki/development Wiki
  */
 class ResultFeed extends AbstractHelper implements TranslatorAwareInterface
 {
@@ -65,27 +67,30 @@ class ResultFeed extends AbstractHelper implements TranslatorAwareInterface
     }
 
     /**
-     * Set up Dublin Core extension.
+     * Set up custom extensions (should be called by factory).
+     *
+     * @param ServiceManager $sm Service manager.
      *
      * @return void
      */
-    protected function registerExtension()
+    public function registerExtensions(ServiceManager $sm)
     {
-        $manager = FeedWriter::getExtensionManager();
+        $manager = new \Laminas\Feed\Writer\ExtensionPluginManager($sm);
         $manager->setInvokableClass(
-            'dublincorerendererentry',
+            'DublinCore\Renderer\Entry',
             'VuFind\Feed\Writer\Extension\DublinCore\Renderer\Entry'
         );
         $manager->setInvokableClass(
-            'dublincoreentry', 'VuFind\Feed\Writer\Extension\DublinCore\Entry'
+            'DublinCore\Entry', 'VuFind\Feed\Writer\Extension\DublinCore\Entry'
         );
         $manager->setInvokableClass(
-            'opensearchrendererfeed',
+            'OpenSearch\Renderer\Feed',
             'VuFind\Feed\Writer\Extension\OpenSearch\Renderer\Feed'
         );
         $manager->setInvokableClass(
-            'opensearchfeed', 'VuFind\Feed\Writer\Extension\OpenSearch\Feed'
+            'OpenSearch\Feed', 'VuFind\Feed\Writer\Extension\OpenSearch\Feed'
         );
+        FeedWriter::setExtensionManager($manager);
         FeedWriter::registerExtension('OpenSearch');
     }
 
@@ -101,11 +106,9 @@ class ResultFeed extends AbstractHelper implements TranslatorAwareInterface
      */
     public function __invoke($results, $currentPath = null)
     {
-        $this->registerExtension();
-
         // Determine base URL if not already provided:
-        if (is_null($currentPath)) {
-            $currentPath = $this->getView()->plugin('currentpath')->__invoke();
+        if (null === $currentPath) {
+            $currentPath = $this->getView()->plugin('currentPath')->__invoke();
         }
         $serverUrl = $this->getView()->plugin('serverurl');
         $baseUrl = $serverUrl($currentPath);
@@ -121,30 +124,37 @@ class ResultFeed extends AbstractHelper implements TranslatorAwareInterface
             );
         }
         $feed->setLink(
-            $baseUrl . $results->getUrlQuery()->setViewParam(null, false)
+            $baseUrl . $results->getUrlQuery()->setViewParam(null)->getParams(false)
         );
         $feed->setFeedLink(
             $baseUrl . $results->getUrlQuery()->getParams(false),
             $results->getParams()->getView()
         );
         $feed->setDescription(
-            $this->translate('Showing') . ' ' . $results->getStartRecord() . '-'
-            . $results->getEndRecord() . ' ' . $this->translate('of') . ' '
-            . $results->getResultTotal()
+            strip_tags(
+                $this->translate(
+                    'showing_results_of_html',
+                    [
+                        '%%start%%' => $results->getStartRecord(),
+                        '%%end%%' => $results->getEndRecord(),
+                        '%%total%%' => $results->getResultTotal()
+                    ]
+                )
+            )
         );
 
         $params = $results->getParams();
 
         // add atom links for easier paging
         $feed->addOpensearchLink(
-            $baseUrl . $results->getUrlQuery()->setPage(1, false),
+            $baseUrl . $results->getUrlQuery()->setPage(1)->getParams(false),
             'first',
             $params->getView()
         );
         if ($params->getPage() > 1) {
             $feed->addOpensearchLink(
                 $baseUrl . $results->getUrlQuery()
-                    ->setPage($params->getPage() - 1, false),
+                    ->setPage($params->getPage() - 1)->getParams(false),
                 'previous',
                 $params->getView()
             );
@@ -153,13 +163,13 @@ class ResultFeed extends AbstractHelper implements TranslatorAwareInterface
         if ($params->getPage() < $lastPage) {
             $feed->addOpensearchLink(
                 $baseUrl . $results->getUrlQuery()
-                    ->setPage($params->getPage() + 1, false),
+                    ->setPage($params->getPage() + 1)->getParams(false),
                 'next',
                 $params->getView()
             );
         }
         $feed->addOpensearchLink(
-            $baseUrl . $results->getUrlQuery()->setPage($lastPage, false),
+            $baseUrl . $results->getUrlQuery()->setPage($lastPage)->getParams(false),
             'last',
             $params->getView()
         );
@@ -228,10 +238,10 @@ class ResultFeed extends AbstractHelper implements TranslatorAwareInterface
             empty($title) ? $this->translate('Title not available') : $title
         );
         $serverUrl = $this->getView()->plugin('serverurl');
-        $recordLink = $this->getView()->plugin('recordlink');
+        $recordLink = $this->getView()->plugin('recordLink');
         try {
             $url = $serverUrl($recordLink->getUrl($record));
-        } catch (\Zend\Mvc\Router\Exception\RuntimeException $e) {
+        } catch (\Laminas\Router\Exception\RuntimeException $e) {
             // No route defined? See if we can get a URL out of the driver.
             // Useful for web results, among other things.
             $url = $record->tryMethod('getUrl');

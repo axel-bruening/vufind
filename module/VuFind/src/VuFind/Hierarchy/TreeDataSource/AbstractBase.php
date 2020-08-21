@@ -2,7 +2,7 @@
 /**
  * Hierarchy Tree Data Source (abstract base)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_DataSource
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
 namespace VuFind\Hierarchy\TreeDataSource;
 
@@ -32,13 +32,13 @@ namespace VuFind\Hierarchy\TreeDataSource;
  *
  * This is a base helper class for producing hierarchy Trees.
  *
- * @category VuFind2
+ * @category VuFind
  * @package  HierarchyTree_DataSource
  * @author   Luke O'Sullivan <l.osullivan@swansea.ac.uk>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
- * @link     http://vufind.org/wiki/vufind2:hierarchy_components Wiki
+ * @link     https://vufind.org/wiki/development:plugins:hierarchy_components Wiki
  */
-abstract class AbstractBase implements \Zend\Log\LoggerAwareInterface
+abstract class AbstractBase implements \Laminas\Log\LoggerAwareInterface
 {
     use \VuFind\Log\LoggerAwareTrait;
 
@@ -48,6 +48,20 @@ abstract class AbstractBase implements \Zend\Log\LoggerAwareInterface
      * @var \VuFind\Hierarchy\Driver\AbstractBase
      */
     protected $hierarchyDriver = null;
+
+    /**
+     * Collection page route.
+     *
+     * @var string
+     */
+    protected $collectionRoute = 'collection';
+
+    /**
+     * Record page route.
+     *
+     * @var string
+     */
+    protected $recordRoute = 'record';
 
     /**
      * Get the hierarchy driver
@@ -74,6 +88,26 @@ abstract class AbstractBase implements \Zend\Log\LoggerAwareInterface
     {
         $this->hierarchyDriver = $driver;
         return $this;
+    }
+
+    /**
+     * Get collection page route.
+     *
+     * @return string
+     */
+    public function getCollectionRoute()
+    {
+        return $this->collectionRoute;
+    }
+
+    /**
+     * Get recordpage route.
+     *
+     * @return string
+     */
+    public function getRecordRoute()
+    {
+        return $this->recordRoute;
     }
 
     /**
